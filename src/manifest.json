@@ -1,0 +1,11 @@
+{
+  "name": "PrintWidget",
+  "type": "widget",
+  "platform": "HTML",
+  "version": "1.2",
+  "wabVersion": "1.2",
+  "author": "Esri R&D Center Beijing",
+  "description": "",
+  "copyright": "",
+  "license": ""
+}
