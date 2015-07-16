@@ -1,11 +1,24 @@
 {
-  "name": "PrintWidget",
-  "type": "widget",
+   "name": "PrintWidget",
+  "2D": true,
+  "3D": false,
   "platform": "HTML",
-  "version": "1.2",
-  "wabVersion": "1.2",
-  "author": "Esri R&D Center Beijing",
-  "description": "",
+  "version": "1.1",
+  "wabVersion": "1.1",
+  "author": "Esri R&D Center Beijing,Extended by GBS",
+  "description": "Custom print widget which uses templates and dependant layouts.",
   "copyright": "",
-  "license": ""
+  "license": "http://www.apache.org/licenses/LICENSE-2.0",
+  "properties": {
+    "inPanel": true,
+    "hasLocale": true,
+    "hasStyle": true,
+    "hasConfig": true,
+    "hasUIFile": true,
+    "hasSettingPage":false,
+    "hasSettingUIFile":false,
+    "hasSettingLocale":false,
+    "hasSettingStyle":false,
+    "IsController":false
+  }
 }

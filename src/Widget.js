@@ -18,7 +18,7 @@ define([
   ) {
     return declare([BaseWidget], {
       baseClass: 'jimu-widget-print',
-      name: 'Print',
+      name: 'PrintWidget',
       className: 'esri.widgets.Print',
       _portalPrintTaskURL: null,
 
@@ -54,9 +54,11 @@ define([
                 defaultFormat: this.config.defaultFormat,
                 defaultLayout: this.config.defaultLayout,
                 defaultMXDTemplate: this.config.defaultMXDTemplate,
-                folderUrl: this.config.folderUrl,
+                configFile: this.configFile,
+                isOOTBPrint: this.config.isOOTBPrint,
                 nls: this.nls,
-                async: async
+                async: async,
+                customPrintConfig:this.config
               });
               this.print.placeAt(this.printNode);
               this.print.startup();
@@ -79,16 +81,24 @@ define([
 
       _getPrintTaskURL: function(portalUrl) {
         var printDef = new Deferred();
-        if (this.config && this.config.serviceURL) {
-          printDef.resolve(this.config.serviceURL);
-          return printDef;
-        }
+        //if (this.config && this.config.serviceURL) {
+        //  this.config.customPrint = true;
+        //  printDef.resolve(this.config.serviceURL);
+        //  return printDef;
+        //}
         var def = portalUtils.getPortalSelfInfo(portalUrl);
         def.then(lang.hitch(this, function(response) {
           var printServiceUrl = response && response.helperServices &&
             response.helperServices.printTask && response.helperServices.printTask.url;
           if (printServiceUrl) {
-            printDef.resolve(printServiceUrl);
+              if ((this.config && this.config.serviceURL == printServiceUrl) || (this.config && new RegExp("utility.arcgisonline.com").test(this.config.serviceURL))) {
+                  this.config.isOOTBPrint = true;
+                  printDef.resolve(this.config.serviceURL);
+              } else if (this.config && this.config.serviceURL != printServiceUrl) {
+                  this.config.isOOTBPrint = false;
+                  printDef.resolve(this.config.serviceURL);
+              }
+              
           } else {
             printDef.reject('error');
           }

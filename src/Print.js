@@ -148,46 +148,22 @@ define([
                 }
             }
         },
-        _getCustomPrintConfig: function () {
-            var me = this;
-            var deferred = new Deferred();
-            var configFilePath = require(utils.getRequireConfig()).toUrl(this.folderUrl + "/print.json");
-            if (configFilePath) {
-                dojo.xhrGet({
-                    url: configFilePath,
-                    handleAs: "json",
-                    load: function (response) {
-                        me.customPrintConfig = response;
-                        deferred.resolve();
-                    },
-                    error: function (response, ioArgs) {
-                        deferred.resolve();
-                    }
-                });
-            } else {
-                deferred.cancel();
-            }
-            return deferred.promise;
-
-        },
         _getPrintTaskInfo: function (handle) {
             // portal own print url: portalname/arcgis/sharing/tools/newPrint
-            this._getCustomPrintConfig().then(lang.hitch(this, function () {
-                esriRequest({
-                    url: this.printTaskURL,
-                    content: {
-                        f: "json"
-                    },
-                    callbackParamName: "callback",
-                    handleAs: handle || "json",
-                    timeout: 60000
-                }).then(
-                lang.hitch(this, '_handlePrintInfo'),
-                lang.hitch(this, '_handleError')
-                ).always(lang.hitch(this, function () {
-                    this.shelter.hide();
-                }));
-            }));
+            esriRequest({
+                url: this.printTaskURL,
+                content: {
+                    f: "json"
+                },
+                callbackParamName: "callback",
+                handleAs: handle || "json",
+                timeout: 60000
+            }).then(
+               lang.hitch(this, '_handlePrintInfo'),
+               lang.hitch(this, '_handleError')
+               ).always(lang.hitch(this, function () {
+                   this.shelter.hide();
+               }));
 
         },
 
@@ -285,7 +261,7 @@ define([
             if (this.defaultFormat) {
                 this.formatDijit.set('value', this.defaultFormat);
             } else {
-                this.formatDijit.set('value', Format[0].defaultValue);
+                this.formatDijit.set('value', formatConfig.defaultValue);
             }
 
 
@@ -360,10 +336,10 @@ define([
         },
 
         print: function () {
-            if (Object.keys(this.customPrintConfig).length > 0) {
-                this.customPrint();
-            } else {
+            if (this.isOOTBPrint) {
                 this.OOTBPrint();
+            } else {
+                this.customPrint();
             }
         },
         customPrint:function(){
