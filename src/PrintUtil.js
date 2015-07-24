@@ -219,8 +219,8 @@ define(
                 });
             }
 
-
-            var w = PrintTask.prototype._getPrintDefinition(map);
+            var printTask = new PrintTask();
+            var w = printTask._getPrintDefinition(map);
 
             var operationalLayers = this.getOperationalLayers(w,map);
             var mapOptions = w.mapOptions;
@@ -371,7 +371,10 @@ define(
             }
             return operationalLayers
         },
-        createNewTextLayerObject:function(layerObj){
+        createNewTextLayerObject: function (layerObj) {
+            if (!layerObj.featureCollection) {
+                return {};
+            }
             var layers = layerObj.featureCollection.layers;
             var pointLayer = array.filter(layers, function (layer,index) {
                 return layer.layerDefinition.geometryType === "esriGeometryPoint";
@@ -379,7 +382,7 @@ define(
             if (pointLayer) {
                 var textLayerIndices = [];
                 var textFeatures = array.filter(pointLayer.featureSet.features, function (feature, index) {
-                    return feature.symbol.type === 'esriTS' && textLayerIndices.push(index)
+                    return feature.symbol && feature.symbol.type === 'esriTS' && textLayerIndices.push(index)
                 });
                 if (textFeatures.length > 0) {
 
