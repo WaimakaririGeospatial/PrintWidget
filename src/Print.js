@@ -463,7 +463,7 @@ define([
                     this._onPrintError(this.nls.printError);
                 }
             } else {
-                var urlPattern = new RegExp("https://");
+                var urlPattern = new RegExp("^http");
                 if (urlPattern.test(data)) {
                     this.url = data;
                     html.setStyle(this.progressBar.domNode, 'display', 'none');
