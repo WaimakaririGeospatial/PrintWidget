@@ -113,10 +113,10 @@
                         </table>
                     </div>
                     
-                    <div style="font-weight:bold;">
+                    <div style="font-weight:bold; display:none;">
                         ${nls.mapOnlyOptions}:
                     </div>
-                    <div data-dojo-type="dijit/form/Form" data-dojo-attach-point="mapOnlyFormDijit">
+                    <div data-dojo-type="dijit/form/Form" style="display: none;" data-dojo-attach-point="mapOnlyFormDijit">
                         <table cellspacing="5">
                             <tr>
                                 <td>
@@ -138,18 +138,17 @@
                             </tr>
                         </table>
                     </div>
-                    <div style="font-weight:bold;">
+                    <div style="font-weight:bold;display:none;">
                         ${nls.printQualityOptions}:
                     </div>
-                    <div data-dojo-type="dijit/form/Form" data-dojo-attach-point="mapQualityFormDijit">
+                    <div data-dojo-type="dijit/form/Form" style="display: none;" data-dojo-attach-point="mapQualityFormDijit">
                         <table cellspacing="5">
                             <tr>
                                 <td>
                                     ${nls.dpi}:
                                 </td>
                                 <td>
-                                    <input type="text" data-dojo-type="dijit/form/NumberTextBox" data-dojo-props="name:'dpi',required:true,value:96,style:'width:100px;'"
-                                    />
+                                    <input type="text" data-dojo-type="dijit/form/NumberTextBox" data-dojo-props="name:'dpi',required:true,value:96,style:'width:100px;'" />
                                 </td>
                             </tr>
                         </table>

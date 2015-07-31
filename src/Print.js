@@ -359,7 +359,9 @@ define([
 
             printUtil.setServiceUrl(this.printTaskURL);
             var textEls = {
-                "title": mapTitle
+                "title": mapTitle,
+                "author": form.author,
+                "copyright": form.copyright,
             }
             var printDeferred = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
 
