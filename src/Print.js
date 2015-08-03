@@ -346,7 +346,7 @@ define([
             var me = this;
             var printUtil = new PrintUtil();
             var form = this.printSettingsFormDijit.get('value');
-
+            lang.mixin(form, this.layoutMetadataDijit.get('value'));
             var map = this.map; //map
             var mapTitle = form.title; //gets the user entered map title
             var printTemplate = form.mxdTemplate; //gets the selected template
