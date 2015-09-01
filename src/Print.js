@@ -357,6 +357,15 @@ define([
             var mapScale = map.getScale();
             var includeLegend = this.layoutFormDijit.get('value').legend;
 
+            var preserve = this.preserveFormDijit.get('value');
+            if (preserve && preserve.preserveScale === 'force') {
+                // force user defined scale
+                mapScale = preserve.forcedScale;
+            } else if (preserve && preserve.preserveScale === "false") {
+                // use extent, unset scale
+                mapScale = 0;
+            }
+
             printUtil.setServiceUrl(this.printTaskURL);
             var textEls = {
                 "title": mapTitle,
