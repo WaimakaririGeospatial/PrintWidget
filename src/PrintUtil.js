@@ -101,8 +101,6 @@ define(
         // Do an async print
         print: function (map, template, layout, format, textElements, quality, extent, scale, lodsToSnapTo, includeLegend) {
 
-           // topic.publish(Event.PRINT_STARTED);
-
             var webmapStr = this.getWebmapJson(map);
 
             // template may be a single template name as a string, or an array of templates 
@@ -204,6 +202,9 @@ define(
 
         },
         getWebmapJson: function (map) {
+
+            var webmapData = map.itemInfo.itemData;
+
             // clear map points selection symbol (cross), this is causing print errors
             if (map.graphics !== null) {
                 array.forEach(map.graphics.graphics, function (graphic, i) {
@@ -258,9 +259,32 @@ define(
                 }
             });
 
-            webmapJson = this.stringify(w); 
+            this.attachWebmapDataToPrintWebmap(w, webmapData);
+            
+            var webmapJson = this.stringify(w); 
 
             return webmapJson;
+        },
+        attachWebmapDataToPrintWebmap: function (printWebmap, webmapData) {
+            // attaches "showLegend" property to webmap object, by default this doesn't exist in print webmaps
+
+            for (var a = 0; a < printWebmap.operationalLayers.length; a++) {
+                var printMapOpLayer = printWebmap.operationalLayers[a];
+
+                for (var b = 0; b < webmapData.operationalLayers.length; b++) {
+                    var rawMapOpLayerData = webmapData.operationalLayers[b];
+                    if (printMapOpLayer.id === rawMapOpLayerData.id) {
+                        if (rawMapOpLayerData.hasOwnProperty("showLegend")) {
+                            printMapOpLayer["showLegend"] = rawMapOpLayerData["showLegend"];
+                        }
+                        if (rawMapOpLayerData.hasOwnProperty("layers") && !printMapOpLayer.hasOwnProperty("layers")) {
+                            printMapOpLayer["layers"] = rawMapOpLayerData["layers"];
+                        }
+                        break;
+                    }
+
+                }
+            }
         },
         processTextElements: function (textElements, printLayout, templateName) {
 

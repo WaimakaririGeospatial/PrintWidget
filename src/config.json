@@ -1,5 +1,5 @@
 {
-    "serviceURL": "https://bear.geobiz.local/arcgis/rest/services/WaiMap/WaiMapPrint/GPServer/Print",
+    "serviceURL": "https://secure.gbs.co.nz/arcgis_anon/rest/services/WDC/WaimapPrint/GPServer/Print",
     "defaultTitle": "ArcGIS Web Map",
     "defaultAuthor": "Web AppBuilder for ArcGIS",
     "defaultCopyright": "",
@@ -37,7 +37,7 @@
         "name": "Layout_Template",
         "displayName": "Layout Template",
         "defaultValue": "",
-        "choiceList": []
+        "choiceList": [ ]
     },
     "format": {
         "name": "Format",

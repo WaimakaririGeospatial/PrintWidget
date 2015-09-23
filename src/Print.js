@@ -355,7 +355,7 @@ define([
             var printableExtent = map.extent;
             var printQualityValue = this.mapQualityFormDijit.get('value').dpi;
             var mapScale = map.getScale();
-            var includeLegend = this.layoutFormDijit.get('value').legend;
+            var includeLegend = this.layoutFormDijit.get('value').legend[0];
 
             var preserve = this.preserveFormDijit.get('value');
             if (preserve && preserve.preserveScale === 'force') {
