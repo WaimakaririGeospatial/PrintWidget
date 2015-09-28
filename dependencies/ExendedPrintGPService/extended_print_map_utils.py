@@ -36,8 +36,8 @@ def _getOperationalLayerObject(webmap, layerId, logFunction = None):
     jsonOperLayerObjs = webmap["operationalLayers"]
     for jsonOperLayerObj in jsonOperLayerObjs:
         jsonObjLayerId = jsonOperLayerObj["id"]
-        
-        jsonObjLayerTitle = None 
+
+        jsonObjLayerTitle = None
         if "title" in jsonOperLayerObj:
              jsonObjLayerTitle = jsonOperLayerObj["title"]
 
@@ -47,7 +47,7 @@ def _getOperationalLayerObject(webmap, layerId, logFunction = None):
         elif layerId == jsonObjLayerTitle:
             resultObj = jsonOperLayerObj
             break
-       
+
     return resultObj
 
 
@@ -132,7 +132,7 @@ def findSubstituteMxd(layerUrl, substitutePath, alternatives, logFunction):
             altPath = altPathArr[1]
 
             if str(matchPath).lower() == mxdFolder.lower():
-                altFile = path.join(substitutePath, altPath, mxdName + ".mxd") 
+                altFile = path.join(substitutePath, altPath, mxdName + ".mxd")
                 logFunction("Searching alternative: ")
                 logFunction(altFile)
                 if path.isfile(altFile):
@@ -177,9 +177,9 @@ def getAddLayers(subLayers, visLayerArray):
                 subLayer.visible = True
             else:
                 subLayer.visible = False
-        
+
     return returnLayers
-    
+
 
 def _includeLayerInLegend(legendAddLayer, layerIndexInt, excludeLayers, webmapObj, logFunction):
 
@@ -189,7 +189,7 @@ def _includeLayerInLegend(legendAddLayer, layerIndexInt, excludeLayers, webmapOb
         if legendAddLayer.isRasterLayer:
             logFunction("RemoveLayers: Raster layer found, skipping: " + legendAddLayer.name)
             shouldAdd = False
-    except Exception as ex: 
+    except Exception as ex:
         logFunction("RemoveLayers: Unable to check if layer is raster: " + legendAddLayer.name)
 
     layerWebmapObj = _getOperationalLayerObject(webmapObj, legendAddLayer.name)
@@ -206,15 +206,15 @@ def _includeLayerInLegend(legendAddLayer, layerIndexInt, excludeLayers, webmapOb
                     if "showLegend" in layerVisObj and layerVisObj["showLegend"] == False:
                         logFunction("RemoveLayers: Sublayer excluded in webmap setting: " + legendAddLayer.longName)
                         shouldAdd = False
-        
+
     for excludeNameMatch in excludeLayers:
         if excludeNameMatch == legendAddLayer.name:
             logFunction("RemoveLayers: Layer excluded through print config: " + legendAddLayer.name)
             shouldAdd = False
             break
-        elif excludeNameMatch[-1] == "*": 
+        elif excludeNameMatch[-1] == "*":
             match = "".join(excludeNameMatch[:-1])
-            if legendAddLayer.name.find(match) > -1: 
+            if legendAddLayer.name.find(match) > -1:
                 # wildcard match found
                 logFunction("RemoveLayers: Layer excluded through print config: " + legendAddLayer.name)
                 shouldAdd = False
@@ -232,7 +232,7 @@ def removeLayers(mapDoc, removeFromLegendOnly, excludeLayers, removeRasters, web
 
     # if removeFromLegendOnly is true, only remove from legend. Otherwise remove from map.
     legendElement = None
-    try:    
+    try:
         legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
     except:
         pass
@@ -288,16 +288,33 @@ def removeLayers(mapDoc, removeFromLegendOnly, excludeLayers, removeRasters, web
                 mapping.RemoveLayer(dataFrame, legendAddLayer)
 
         layerIndex += 1
-        
 
-def isLegendOverflowing(mapDoc):
+## test if legend has overflowed through arcpy function and height check
+def isLegendOverflowing(mapDoc, initialHeight, logFunction):
 
     legendElement = None
     dataFrame = mapping.ListDataFrames(mapDoc)[0]
 
     legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
-    return legendElement.isOverflowing
+    logFunction("Legend height before: " + str(initialHeight) + " after: " + str(legendElement.elementHeight))
+    logFunction("legendElement.isOverflowing: " + str(legendElement.isOverflowing))
 
+    if(legendElement.isOverflowing or legendElement.elementHeight > initialHeight):
+        return True
+    return False
+
+
+## return legend height, or 0 if no legend found
+def getLegendHeight(mapDoc):
+
+    legendElement = None
+    # if removeFromLegendOnly is true, only remove from legend. Otherwise remove from map.
+    legendElement = None
+    try:
+        legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
+    except:
+        return 0
+    return legendElement.elementHeight
 
 
 def getSwatchCount(layers, logFunction):
@@ -306,10 +323,10 @@ def getSwatchCount(layers, logFunction):
     for legendAddLayer in layers:
         # count number of items in legend, approximate
         if not legendAddLayer.isGroupLayer and legendAddLayer.visible:
-            legendItemCount += 1 
+            legendItemCount += 1
             try:
-                # most layers used at AC are "UNIQUE_VALUES" or "OTHER" 
-                if legendAddLayer.symbologyType == "UNIQUE_VALUES": 
+                # most layers used at AC are "UNIQUE_VALUES" or "OTHER"
+                if legendAddLayer.symbologyType == "UNIQUE_VALUES":
                     symVals = legendAddLayer.symbology.classValues
                     legendItemCount = legendItemCount + len(symVals)
             except Exception as ex:
@@ -330,7 +347,7 @@ def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, log
         matchName = webLayer.name
         layerUrl = _getLayerUrlFromIdInWebmap(webmap, matchName)
         visLayerArray = _getVisibleLayersFromIdInWebmap(webmap, matchName)
-        
+
 
         if layerUrl:
             layerIndex = _getLayerIndexFromUrl(layerUrl)
@@ -349,7 +366,7 @@ def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, log
                     # feature layer or stand alone map service layer
                     # replace individual layer only
                     if layerIndex < len(subLayers):
-                        
+
                         subLayer = subLayers[layerIndex]
                         if webLayer.supports("transparency") and webLayer.transparency > 0:
                             subLayer.transparency = webLayer.transparency
@@ -360,7 +377,7 @@ def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, log
                 else:
                     # map service layer, add in all layers from sub mxd
                     addSubLayerList = getAddLayers(subLayers, visLayerArray)
-                                
+
                     for addSubLayer in addSubLayerList:
                         if webLayer.supports("transparency") and webLayer.transparency > 0:
                             addSubLayer.transparency = webLayer.transparency
@@ -373,7 +390,7 @@ def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, log
             else:
                 # no mxd exists on disk
                 pass
-            
+
 
 
 
@@ -401,7 +418,7 @@ def copyLayers(fromLayerList, toMapDoc, outputFolder, removeExistingLayers = Fal
 
     if removeExistingLayers:
         # make a copy of map doc so we can edit it
-        toMapDoc = cloneMapDoc(toMapDoc, outputFolder)    
+        toMapDoc = cloneMapDoc(toMapDoc, outputFolder)
 
     toDataFrame = mapping.ListDataFrames(toMapDoc)[0]
 
@@ -433,7 +450,7 @@ def setExtentAndScale(mapDoc, extent = None, scale = -1, lodsArray = []):
                 closestScale = lodScale
         if closestScale > 0:
             dataFrame.scale = closestScale
-        
+
     clearScaleRangeBasemaps(mapDoc, dataFrame.scale)
 
     return mapDoc
@@ -454,7 +471,7 @@ def exportMapDocToFile(exportableMapDoc, formatStr, outputFolder, quality):
         # low quality, 200 dpi NORMAL
         # high quality, 149 dpi BEST
         pdfImageQuality = "NORMAL"
-        if quality < 175: 
+        if quality < 175:
             pdfImageQuality = "BEST"
         mapping.ExportToPDF(exportableMapDoc, outputFilePath, "PAGE_LAYOUT", 0, 0, quality, pdfImageQuality)
 
@@ -495,7 +512,7 @@ def combineImageDocuments(fileList, format):
 
 def getTargetLegendMxd(legendItemCount, config):
     targetMxd = None
-    for configItem in config: 
+    for configItem in config:
         if legendItemCount < configItem["itemLimit"]:
             targetMxd = configItem["mxd"]
             break
@@ -519,14 +536,14 @@ def processInlineLegend(mapDoc, showLegend, excludeLayers, webmapObj, logFunctio
 
     legendDataFrame = mapping.ListDataFrames(mapDoc)[0]
     legendElement = None
-    try: 
+    try:
         legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
     except:
         pass
     if legendElement:
         if showLegend:
             logFunction("Processing inline legend")
-            removeLayers(mapDoc, True, excludeLayers, True, webmapObj, logFunction) 
+            removeLayers(mapDoc, True, excludeLayers, True, webmapObj, logFunction)
         else:
             logFunction("Hiding inline legend")
             legendElement.elementPositionX = 90000
@@ -560,7 +577,7 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
     for legendMxdPath in legendMxdList:
         if targetMxd.lower() in legendMxdPath.lower():
             logFunction("Creating legend from mxd: " + legendMxdPath)
-                
+
             legendMxd = mapping.MapDocument(legendMxdPath)
             legendDataFrame = mapping.ListDataFrames(legendMxd)[0]
             legendElement = mapping.ListLayoutElements(legendMxd, "LEGEND_ELEMENT", "Legend")[0]
@@ -570,10 +587,10 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
 
             for legendAddLayer in legendAddLayers:
                 mapping.AddLayer(legendDataFrame, legendAddLayer, "BOTTOM")
-                
+
             legendDataFrame.extent = mapDocDataFrame.extent
             legendDataFrame.scale = mapDocDataFrame.scale
-            
+
             removeLayers(legendMxd, True, excludeLayers, True, webmapObj, logFunction)
 
             if style:
@@ -581,10 +598,10 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
                     legendElement.updateItem(addedLayer, style)
 
             returnMxdList.append(legendMxd)
-        
+
     return returnMxdList
-          
-        
+
+
 
 
 

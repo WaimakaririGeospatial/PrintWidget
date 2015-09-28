@@ -16,9 +16,9 @@
 ##
 ##   - Place the toolbox and the main script (ac_print_geoproc_service) in a folder accessible to ArcMap
 ##
-##   - Open the toolbox in ArcMap, and run. 
+##   - Open the toolbox in ArcMap, and run.
 ##
-##   - Using the Geoprocessing -> results menu in ArcMap, right click on the result and Share As a service. 
+##   - Using the Geoprocessing -> results menu in ArcMap, right click on the result and Share As a service.
 ##
 ##   - Publish as an asynchronous geoprocessing service. Set message logging to "info" to be able to check for errors.
 ##
@@ -62,19 +62,19 @@ def log(s, isError = False):
         resultObj["error"] += s
 
 
-def process(templateRootPath, 
-            layoutNameStr, 
-            outputFolder, 
-            formatStr, 
-            quality, 
-            mapScale, 
-            extentObj, 
-            textElementsList, 
-            lodsArray, 
-            includeLegend, 
+def process(templateRootPath,
+            layoutNameStr,
+            outputFolder,
+            formatStr,
+            quality,
+            mapScale,
+            extentObj,
+            textElementsList,
+            lodsArray,
+            includeLegend,
             legendExcludeLayers,
             legendTemplateConfig):
-    
+
 
     log("Using template root: " + templateRootPath)
     if not path.isdir(templateRootPath):
@@ -87,6 +87,7 @@ def process(templateRootPath,
 
     layoutMxd = fileUtils.getLayoutMapDoc(templateRootPath, layoutNameStr)
     log("Using layout map doc: " + layoutMxd.filePath)
+    initialLegendHeight = mapUtils.getLegendHeight(layoutMxd)
 
     # webmaps
     log("Converting webmaps to map documents...")
@@ -144,7 +145,7 @@ def process(templateRootPath,
             log("Processing text elements...")
             mapUtils.processTextElements(outMapDoc, {settings.REPLACE_LAYER_ELEMENT_NAME: title})
             outputMapDocs.append(outMapDoc)
-            
+
     for outMapDoc in outputMapDocs:
 
         styleFile = settings.LEGEND_STYLE_FILE
@@ -161,7 +162,7 @@ def process(templateRootPath,
             legendItemCount = mapUtils.getSwatchCount(legendLayers, log)
             log("Legend swatch count estimate: " + str(legendItemCount))
 
-            legendIsOverflowing = mapUtils.isLegendOverflowing(mapDocCloneForLegend)
+            legendIsOverflowing = mapUtils.isLegendOverflowing(mapDocCloneForLegend, initialLegendHeight, log)
             log("Legend is overflowing: " + str(legendIsOverflowing))
 
             if not legendIsOverflowing:
@@ -200,7 +201,7 @@ def process(templateRootPath,
             for legendMxd in processedLegendMxds:
                 exportLegendFile = mapUtils.exportMapDocToFile(legendMxd, formatStr, outputFolder, quality)
                 exportedImageFilePaths.append(exportLegendFile)
-            
+
     # append pdf legends
     if includeLegend:
         for legendFile in legendPdfList:
@@ -222,7 +223,7 @@ try:
     fileUtils.LAYOUT_DIR_NAME = settings.TEMPLATE_LAYOUT_DIR_NAME
     fileUtils.REPLACE_DIR_NAME = settings.TEMPLATE_REPLACE_DIR_NAME
     fileUtils.LEGEND_DIR_NAME = settings.TEMPLATE_LEGEND_DIR_NAME
-    
+
 
     # start processing request
     log("Collecting parameters...")
@@ -319,7 +320,7 @@ try:
         templateRootPath = path.join(settings.TEMPLATES_PATH, template)
         layoutNameList = fileUtils.getLayoutNameList(templateRootPath)
         resultObj["layouts"] = layoutNameList
-        
+
     else:
         # sign in to portal as an admin user so we have access to all webmap layers
         if settings.PORTAL_USER:
@@ -329,11 +330,11 @@ try:
         extraWebmapConversionOptions = {}
         extraWebmapConversionOptions["SERVER_CONNECTION_FILE"] = settings.SERVER_CONNECTIONS
 
-        # process each file and combine 
-        outFiles = [] 
+        # process each file and combine
+        outFiles = []
         for template in templateList:
             templateRootPath = path.join(settings.TEMPLATES_PATH, template)
-            generatedOutFiles = process(templateRootPath, layoutNameStr, outputFolder, formatStr, quality, mapScale, extentObj, 
+            generatedOutFiles = process(templateRootPath, layoutNameStr, outputFolder, formatStr, quality, mapScale, extentObj,
                 textElementsList, lodsArray, includeLegend, legendExcludeLayers, settings.LEGEND_TEMPLATE_CONFIG)
             outFiles.extend(generatedOutFiles)
         if len(outFiles) > 0:
@@ -345,7 +346,7 @@ try:
             resultObj["url"] = outputFolderUrl + "/" + finalFileName
         else:
             raise Exception("No files were generated")
-        
+
 
 
 except Exception as e:
