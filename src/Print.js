@@ -298,7 +298,7 @@ define([
             }
 
 
-            //3.MXD Template 
+            //3.MXD Template
             var mxdConfig = array.filter(data.parameters, function (param) {
                 return param.name === "MXD_Template";
             })[0];
@@ -383,20 +383,26 @@ define([
                 "author": form.author,
                 "copyright": form.copyright,
             }
-            var printDeferred = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
 
-            var result = new printResultDijit({
-                count: this.count.toString(),
-                icon: (form.format === "PDF") ? this.pdfIcon : this.imageIcon,
-                docName: form.title,
-                OOTBPrint:false,
-                title: form.format + ', ' + form.layout,
-                fileHandle: printDeferred,
-                nls: this.nls
-            }).placeAt(this.printResultsNode, 'last');
-            result.startup();
-            domStyle.set(this.clearActionBarNode, 'display', 'block');
-            this.count++;
+            //var printDeferred = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
+            var getPrintProperties = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
+            getPrintProperties.then(lang.hitch(this, function(printDeferred){
+              console.warn(" =======> this should be right at the end");
+              var result = new printResultDijit({
+                  count: this.count.toString(),
+                  icon: (form.format === "PDF") ? this.pdfIcon : this.imageIcon,
+                  docName: form.title,
+                  OOTBPrint:false,
+                  title: form.format + ', ' + form.layout,
+                  fileHandle: printDeferred,
+                  nls: this.nls
+              }).placeAt(this.printResultsNode, 'last');
+              result.startup();
+              domStyle.set(this.clearActionBarNode, 'display', 'block');
+              this.count++;
+            }));
+
+
         },
         OOTBPrint: function () {
             if (this.printSettingsFormDijit.isValid()) {

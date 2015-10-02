@@ -61,6 +61,20 @@ def log(s, isError = False):
             resultObj["error"] += "; "
         resultObj["error"] += s
 
+def getTemplateLegendItemLimit(config, template):
+
+    layoutItemLimit = -1
+    try:
+        legendStyleTemplateConfig = config[template]
+    except Exception as e:
+        legendStyleTemplateConfig = []
+
+    # check for legend items limit
+    for layoutItem in legendStyleTemplateConfig:
+        if (layoutItem['name']+'.mxd') == layoutNameStr :
+            layoutItemLimit = layoutItem['itemLimit']
+
+    return layoutItemLimit
 
 def process(templateRootPath,
             layoutNameStr,
@@ -73,7 +87,8 @@ def process(templateRootPath,
             lodsArray,
             includeLegend,
             legendExcludeLayers,
-            legendTemplateConfig):
+            legendTemplateConfig,
+            layoutItemLimit):
 
 
     log("Using template root: " + templateRootPath)
@@ -163,7 +178,18 @@ def process(templateRootPath,
             log("Legend swatch count estimate: " + str(legendItemCount))
 
             legendIsOverflowing = mapUtils.isLegendOverflowing(mapDocCloneForLegend, initialLegendHeight, log)
-            log("Legend is overflowing: " + str(legendIsOverflowing))
+            log("Legend is overflowing (arcpy): " + str(legendIsOverflowing))
+
+            # secondary check as sometimes the arcpy appraoch allows overflowing
+            if not legendIsOverflowing:
+                # get legend item count from webmap details
+                clientSideLegendItemCount = mapUtils.getSwatchCountFromWebmap(webMapObj, log)
+
+                #check against client side item count limit
+                log("Legend items client side count : " + str(clientSideLegendItemCount) + " - limit " + str(layoutItemLimit))
+                if layoutItemLimit > -1 and clientSideLegendItemCount > layoutItemLimit:
+                    legendIsOverflowing = True
+                    log("Overflowing based on client side count")
 
             if not legendIsOverflowing:
                 outMapDoc = mapUtils.cloneMapDoc(outMapDoc, outputFolder)
@@ -244,6 +270,17 @@ try:
 
     ## DEBUG ##
     #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":1755268.0160213956,"ymin":5920584.470725218,"xmax":1755841.2937333588,"ymax":5920863.645027658,"spatialReference":{"wkid":2193,"latestWkid":2193}},"spatialReference":{"wkid":2193,"latestWkid":2193}},"operationalLayers":[{"id":"Light_1246","title":"Light_1246","opacity":1,"minScale":18489297.737236,"maxScale":1128.497176,"url":"https://s1-ts.cloud.eaglegis.co.nz/arcgis/rest/services/Canvas/Light/MapServer"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,15,16,17,19,20,21,22],"layers":[{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2],"showLegend":false},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
+    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19423895.228000317,"ymin":-4434093.601296845,"xmax":19471477.278107774,"ymax":-4404550.689864664,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"World_Street_Map_8421","title":"World_Street_Map_8421","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"},{"id":"SPWM_DRIVER_TESTING_UAT_5316","title":"SPWM_DRIVER_TESTING_UAT","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/SPWM_DRIVER_TESTING_UAT/MapServer","visibleLayers":[0,1,2],"layers":[{"id":1,"showLegend":false}]},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22],"layers":[{"id":16,"showLegend":false},{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2]},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"RSRPTest_6878","title":"RSRPTest","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/RSRPTest/MapServer","visibleLayers":[0,1]},{"id":"CamerasRelate_3610","title":"CamerasRelate","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/CamerasRelate/MapServer","visibleLayers":[0]},{"id":"NZTA_Theme_Cameras_8509","title":"NZTA_Theme_Cameras","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Theme_Cameras/MapServer","visibleLayers":[0]},{"id":"NZTACamerasTime_6661","title":"NZTACamerasTime","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTACamerasTime/MapServer","visibleLayers":[0,1]},{"id":"PID_Service_5963","title":"PID_Service","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/MRP/PID_Service/MapServer","visibleLayers":[0,1]},{"id":"NZTA_Editing_4351","title":"NZTA_Editing - Edit Polygons","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"color":[223,115,255,255],"outline":{"color":[110,110,110,255],"width":0.6,"type":"esriSLS","style":"esriSLSSolid"},"type":"esriSFS","style":"esriSFSSolid"}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/2","showLegend":true},{"id":"NZTA_Editing_4718","title":"NZTA_Editing - Edit Lines","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"color":[76,0,115,255],"width":1.7,"type":"esriSLS","style":"esriSLSSolid"}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/1"},{"id":"NZTA_Editing_9805","title":"NZTA_Editing - Edit Points","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"angle":0,"xoffset":0,"yoffset":0,"type":"esriPMS","url":"6424ad8f91e78472b03bd60a67ce739b","imageData":"iVBORw0KGgoAAAANSUhEUgAAABIAAAAPCAYAAADphp8SAAAAAXNSR0IB2cksfwAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAS1JREFUOI2d0ztLw1AYxvH/kWKlFC9VCG1Xh4KbODgo+gEEwVsm6SAUQZykToLFwQuKOEq2DoVEXQR3V7+Ak6ttiJRMdkg1PQ7WamJJ0zzbe3jP7zzLiREit9ST60y8B+3EeiE6ZqJF87GMtZhHaUSGRFzu4zAzhLsHHEWCDF6zOBTbY9HAulZR3iI0GjgGEu0hCa1DYKcvSE+Z09hy03sqCwbVK5XsS2hI2PISEP59iTgB1kJBBrUVYKHrA7B6kzJnN+z0UyCkUR+UNM/8Vf5G2vIcmA+EhvnYFTAZ4ADMGdSWVTL3XaE7quMu8qAH8p04p5rz/FBgyv0HfSJKAkZDQQ65Eca2AM0D6Zg5gdwOhfymVMaq5FEaHUggL/wNQyT983U6F1UyS30innwBr21SCpiLLJcAAAAASUVORK5CYII=","contentType":"image/png","width":13,"height":11}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/0","showLegend":true},{"id":"graphicsLayer1","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[{"layerDefinition":{"name":"polygonLayer","geometryType":"esriGeometryPolygon"},"featureSet":{"geometryType":"esriGeometryPolygon","features":[{"geometry":{"rings":[[[19444380.351580717,-4415672.277480143],[19447858.236367688,-4415442.966395288],[19448546.16962225,-4422589.828539941],[19444991.847806994,-4422131.206370232],[19442545.862901874,-4418691.540097403],[19444380.351580717,-4415672.277480143]]],"spatialReference":{"wkid":102100}},"attributes":{"uniqueId":1443148676503},"symbol":{"color":[255,255,0,128],"outline":{"color":[71,105,146,255],"width":1.5,"type":"esriSLS","style":"esriSLSSolid"},"type":"esriSFS","style":"esriSFSSolid"}}]}}]}},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
+    #extentJson = '{"xmin":19423895.228000317,"ymin":-4434093.601296845,"xmax":19471477.278107774,"ymax":-4404550.689864664,"spatialReference":{"wkid":102100}}'
+    ##gbs.sjh - test small legend
+    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19452132.11070773,"ymin":-4417935.657548526,"xmax":19452727.48349844,"ymax":-4417515.2538929,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"OpenStreetMap","title":"OpenStreetMap","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://a.tile.openstreetmap.org","type":"OpenStreetMap"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22],"legendCount":8,"layers":[{"id":16,"showLegend":false},{"id":0,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
+    #extent = '{"xmin":19452132.11070773,"ymin":-4417935.657548526,"xmax":19452727.48349844,"ymax":-4417515.2538929,"spatialReference":{"wkid":102100}}'
+
+    ##gbs - test simple unique item renderer
+    ##webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19379067.474906977,"ymin":-4340911.062590534,"xmax":19487684.492100064,"ymax":-4278462.0104816295,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"OpenStreetMap","title":"OpenStreetMap","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://a.tile.openstreetmap.org","type":"OpenStreetMap"},{"id":"NZTACamerasTime_6661","title":"NZTACamerasTime","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTACamerasTime/MapServer","visibleLayers":[1]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
+    ##extent = '{"xmin":19379067.474906977,"ymin":-4340911.062590534,"xmax":19487684.492100064,"ymax":-4278462.0104816295,"spatialReference":{"wkid":102100}}'
+
+    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":1755268.0160213956,"ymin":5920584.470725218,"xmax":1755841.2937333588,"ymax":5920863.645027658,"spatialReference":{"wkid":2193,"latestWkid":2193}},"spatialReference":{"wkid":2193,"latestWkid":2193}},"operationalLayers":[{"id":"Light_1246","title":"Light_1246","opacity":1,"minScale":18489297.737236,"maxScale":1128.497176,"url":"https://s1-ts.cloud.eaglegis.co.nz/arcgis/rest/services/Canvas/Light/MapServer"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,15,16,17,19,20,21,22],"layers":[{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2],"showLegend":false},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
     #mapScaleStr = '1128.497176'
     #layoutNameStr = 'A4 Landscape'
     #templateStr = 'Standard'
@@ -315,6 +352,7 @@ try:
     else:
         templateList = [templateStr]
 
+    # just return the layout styles from the template folders - NOT producing a map export
     if getLayoutsStr and getLayoutsStr == "true":
         template = templateList[0]
         templateRootPath = path.join(settings.TEMPLATES_PATH, template)
@@ -334,8 +372,9 @@ try:
         outFiles = []
         for template in templateList:
             templateRootPath = path.join(settings.TEMPLATES_PATH, template)
+            layoutItemLimit = getTemplateLegendItemLimit(settings.LEGEND_STYLE_TEMPLATE_LIMITS_CONFIG, template)
             generatedOutFiles = process(templateRootPath, layoutNameStr, outputFolder, formatStr, quality, mapScale, extentObj,
-                textElementsList, lodsArray, includeLegend, legendExcludeLayers, settings.LEGEND_TEMPLATE_CONFIG)
+                textElementsList, lodsArray, includeLegend, legendExcludeLayers, settings.LEGEND_TEMPLATE_CONFIG, layoutItemLimit)
             outFiles.extend(generatedOutFiles)
         if len(outFiles) > 0:
 
@@ -358,18 +397,3 @@ finally:
     log("Result object: ")
     log(resultObjJson)
     arcpy.SetParameterAsText(0, resultObjJson)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

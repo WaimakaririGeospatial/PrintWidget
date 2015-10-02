@@ -333,6 +333,18 @@ def getSwatchCount(layers, logFunction):
                 pass
     return legendItemCount
 
+# calculation of legend count wass made on client side, is in operationalLayers
+def getSwatchCountFromWebmap(webmap, logFunction):
+
+    legendItemCount = 0
+
+    jsonOperLayerObjs = webmap["operationalLayers"]
+    for jsonOperLayerObj in jsonOperLayerObjs:
+        if jsonOperLayerObj.has_key('legendCount'):
+			if not jsonOperLayerObj.has_key('showLegend') or jsonOperLayerObj['showLegend'] == True:
+				logFunction(str(jsonOperLayerObj['id']) + ' clientItemCount : ' + str(jsonOperLayerObj['legendCount']))
+				legendItemCount += int(jsonOperLayerObj['legendCount'])
+    return legendItemCount
 
 def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, logFunction):
     # for map and legend quality, substitute mxds can be supplied
@@ -600,19 +612,3 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
             returnMxdList.append(legendMxd)
 
     return returnMxdList
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

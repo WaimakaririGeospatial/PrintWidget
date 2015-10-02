@@ -7,7 +7,7 @@
 # "C:\Python27\ArcGISx6410.2\Lib\site-packages\server10.2.pth"
 #
 
-# Directory for saving outputs 
+# Directory for saving outputs
 # this will be created when the geoprocessing service has run once, it is not necessary to create this manually
 # cannot use the root output dir as AGS does not allow saving there
 AGS_OUTPUT_DIRECTORY = r'D:\Work\Waimap\svn\geoprocessing\out'
@@ -67,8 +67,8 @@ SERVER_CONNECTIONS = [
 # layers to exclude from legend, can include group or individual layers
 # wildcard (*) can be used at end of item
 LEGEND_EXCLUDE_LAYERS = [
-    "polygonLayer", "polylineLayer", "pointLayer", "Outline", "New Group Layer", "Polygons" # graphics layers 
-    
+    "polygonLayer", "polylineLayer", "pointLayer", "Outline", "New Group Layer", "Polygons" # graphics layers
+
     ]
 
 
@@ -76,13 +76,96 @@ LEGEND_EXCLUDE_LAYERS = [
 # in order from lowest limit to highest
 LEGEND_TEMPLATE_CONFIG = [
     {
-        "itemLimit": 200, 
+        "itemLimit": 200,
         "mxd": "LegendA4"
     },
     {
-        "itemLimit": 9999999, 
+        "itemLimit": 9999999,
         "mxd": "LegendA3"
 }]
+
+# match the layout structures from the
+# TEMPLATES_PATH
+LEGEND_STYLE_TEMPLATE_LIMITS_CONFIG = {
+        'Localised Flood Hazard' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 10
+        }],
+        'PIMS Farm Ops' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 10
+        }],
+        'PIMS Races' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 10
+        }],
+        'PIMS Soils' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 10
+        }],
+        'Standard' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 18
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 18
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 12
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 5
+        }],
+        'Utilities' : [{
+            'name': 'A3 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A3 Portrait',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Landscape',
+            'itemLimit': 10
+        }, {
+            'name': 'A4 Portrait',
+            'itemLimit': 10
+        }]
+    }
 
 # a file containing user custom styles
 # can be copied from arcmap:
@@ -92,5 +175,3 @@ LEGEND_TEMPLATE_CONFIG = [
 LEGEND_STYLE_FILE = r""
 # the name of the custom style, as seen in ArcMap
 LEGEND_STYLE_NAME = r""
-
-
