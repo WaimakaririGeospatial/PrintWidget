@@ -527,7 +527,7 @@ define(
           return legendItemsOut;
         },
         getRendererItemCount: function(renderer, layerWebMapConfig){
-          if (layerWebMapConfig.showLegend === false) {
+          if (layerWebMapConfig && layerWebMapConfig.showLegend === false) {
             return 0;
           }
 
