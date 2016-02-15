@@ -6,6 +6,7 @@
     "defaultFormat": "",
     "defaultMXDTemplate": "",
     "defaultLayout": "",
+    "titleMaxLength": 30,
     "mxdTemplate": {
         "name": "MXD_Template",
         "displayName": "Layout Template",

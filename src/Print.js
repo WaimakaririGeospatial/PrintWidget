@@ -71,6 +71,7 @@ define([
         defaultFormat: null,
         defaultMXDTemplate: null,
         defaultLayout: null,
+        titleMaxLength: null,
         customPrintConfig: {},
         baseClass: "gis_PrintDijit",
         pdfIcon: require.toUrl("./widgets/PrintWidget/images/pdf.png"),
@@ -98,6 +99,10 @@ define([
             this.shelter.show();
 
             this.titleNode.set('value', this.defaultTitle);
+            if (this.titleMaxLength) {
+                this.titleNode.set('maxlength', this.titleMaxLength);
+            }
+
             this.authorNode.set('value', this.defaultAuthor);
             this.copyrightNode.set('value', this.defaultCopyright);
 
@@ -384,23 +389,46 @@ define([
                 "copyright": form.copyright,
             }
 
-            //var printDeferred = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
-            var getPrintProperties = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
-            getPrintProperties.then(lang.hitch(this, function(printDeferred){
-              console.warn(" =======> this should be right at the end");
+            var loadingResult = new printResultDijit({
+                count: this.count.toString(),
+                icon: (form.format === "PDF") ? this.pdfIcon : this.imageIcon,
+                docName: form.title,
+                OOTBPrint: false,
+                title: form.format + ', ' + form.layout,
+                fileHandle: null,
+                nls: this.nls
+            }).placeAt(this.printResultsNode, 'last');
+
+            loadingResult.startup();
+
+            var printJob = printUtil.print(map, printTemplate, printLayout, outputFormat, textEls, printQualityValue, printableExtent, mapScale, null, includeLegend);
+            printJob.then(lang.hitch(this, function(printResult){
+              
+                if (loadingResult) {
+                    loadingResult.destroy();
+                }
+                var fileHandleDef = this.handlePrintResult(printResult);
+
               var result = new printResultDijit({
                   count: this.count.toString(),
                   icon: (form.format === "PDF") ? this.pdfIcon : this.imageIcon,
                   docName: form.title,
                   OOTBPrint:false,
                   title: form.format + ', ' + form.layout,
-                  fileHandle: printDeferred,
+                  fileHandle: fileHandleDef,
                   nls: this.nls
               }).placeAt(this.printResultsNode, 'last');
               result.startup();
+
               domStyle.set(this.clearActionBarNode, 'display', 'block');
               this.count++;
-            }));
+            }), function(err) {
+                alert("An error occurred while printing. Please contact the administrator.");
+                if (loadingResult) {
+                    loadingResult.destroy();
+                }
+
+            });
 
 
         },
@@ -467,7 +495,20 @@ define([
 
         getCurrentMapScale: function () {
             this.forceScaleNTB.set('value', this.map.getScale());
+        },
+        handlePrintResult: function (resultUrl, err) {
+            var deferred = new Deferred();
+            if (resultUrl) {
+                deferred.resolve({
+                    url: resultUrl
+                });
+            } else {
+                deferred.refect(null);
+            }
+
+            return deferred.promise;
         }
+
     });
 
     // Print result dijit
@@ -478,7 +519,10 @@ define([
         OOTBPrint:false,
         postCreate: function () {
             this.inherited(arguments);
-            this.fileHandle.then(lang.hitch(this, '_onPrintComplete'), lang.hitch(this, '_onPrintError'));
+            if (this.fileHandle) {
+                this.fileHandle.then(lang.hitch(this, '_onPrintComplete'), lang.hitch(this, '_onPrintError'));
+            }
+            
         },
         _onPrintComplete: function (data) {
             if (this.OOTBPrint) {
@@ -492,8 +536,8 @@ define([
                 }
             } else {
                 var urlPattern = new RegExp("^http");
-                if (urlPattern.test(data)) {
-                    this.url = data;
+                if (urlPattern.test(data.url)) {
+                    this.url = data.url;
                     html.setStyle(this.progressBar.domNode, 'display', 'none');
                     html.setStyle(this.successNode, 'display', 'inline-block');
                     domClass.add(this.resultNode, "printResultHover");

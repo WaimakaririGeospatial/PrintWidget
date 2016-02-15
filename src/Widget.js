@@ -4,6 +4,8 @@ define([
     'jimu/portalUtils',
     'dojo/_base/lang',
     'dojo/Deferred',
+    'dojo/query',
+    'dojo/dom-attr',
     "jimu/dijit/Message",
     'jimu/dijit/LoadingShelter',
     './Print',
@@ -12,7 +14,7 @@ define([
     'jimu/portalUrlUtils'
   ],
   function(
-    declare, BaseWidget, portalUtils, lang, Deferred,
+    declare, BaseWidget, portalUtils, lang, Deferred, domQuery, domAttr,
     Message, LoadingShelter, Print, esriRequest,
     dojoJSON, portalUrlUtils
   ) {
@@ -36,6 +38,7 @@ define([
         this.inherited(arguments);
         this.shelter.show();
         this._initPrinter();
+        this._setVersionTitle();
       },
 
       _initPrinter: function() {
@@ -53,6 +56,7 @@ define([
                 defaultTitle: this.config.defaultTitle,
                 defaultFormat: this.config.defaultFormat,
                 defaultLayout: this.config.defaultLayout,
+                titleMaxLength: this.config.titleMaxLength,
                 defaultMXDTemplate: this.config.defaultMXDTemplate,
                 configFile: this.configFile,
                 isOOTBPrint: this.config.isOOTBPrint,
@@ -98,7 +102,7 @@ define([
                   this.config.isOOTBPrint = false;
                   printDef.resolve(this.config.serviceURL);
               }
-              
+
           } else {
             printDef.reject('error');
           }
@@ -169,6 +173,22 @@ define([
         if (user.userId && this.print) {
           this.print.updateAuthor(user.userId);
         }
-      }
+      },
+
+  		_setVersionTitle: function(){
+  			var widgetBody = domQuery(this.domNode).closest('.jimu-panel');
+  			var titleNode = domQuery('.title-label', widgetBody[0]);
+
+  			var manifestInfo = this.manifest;
+  			var version = manifestInfo.version;
+  			var clientVersion = manifestInfo.clientVersion;
+  			var client = manifestInfo.client;
+
+  			var title = "Dev version: " + version+"\n";
+  			title += "Client version: " + clientVersion+"\n";
+  			title += "Client: " + client;
+  			domAttr.set(titleNode[0], 'title', title);
+
+  		}
     });
   });

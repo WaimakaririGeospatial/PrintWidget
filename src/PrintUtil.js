@@ -85,12 +85,12 @@ define(
     var PrintUtil = declare("PrintUtil", null, {
         _currentJobId: null,
         _serviceUrl: "",
-        _geoprocesser: null,
+        _geoprocessor: null,
 
         // URL always needs to be set here
         setServiceUrl: function (serviceUrl) {
             this._serviceUrl = serviceUrl;
-            this._geoprocesser = new Geoprocessor(this._serviceUrl);
+            this._geoprocessor = new Geoprocessor(this._serviceUrl);
         },
         // Do an async call to get available layouts
         getLayouts: function (template) {
@@ -104,69 +104,95 @@ define(
             return this.doGeoprocCallAsync(params, "layouts");
 
         },
+        // call to get available templates
+        // set print URL correctly before running
+        getTemplates: function () {
+
+            // the deferred returns an array of strings, these are available template names on disk
+            // don't specify a template, all templates are returned
+            var params = {
+                template: "",
+                getlayouts: true
+            }
+
+            // the deferred returns an array of strings
+            var deferred = new Deferred();
+            if (!this._serviceUrl) {
+                deferred.reject("PrintUtil service URL is not set.");
+            } else {
+                deferred = this.doGeoprocCallAsync(params, "templates");
+            }
+            return deferred;
+
+        },
         // Do an async print
         print: function (map, template, layout, format, textElements, quality, extent, scale, lodsToSnapTo, includeLegend) {
+
             var dfd = new Deferred();
-            this.getWebmapJson(map).then(lang.hitch(this, function(webmapStr){
-              //var webmapStr = this.getWebmapJson(map);
+            this.getWebmapJson(map, scale).then(lang.hitch(this, function (webmapStr) {
 
-              // template may be a single template name as a string, or an array of templates
-              var templateName = template;
-              if (templateName.constructor === Array && templateName.length > 0) {
-                  templateName = template[0];
-              }
-              textElements = this.processTextElements(textElements, layout, templateName);
-              var textElementsStr = JSON.stringify(textElements);
+                // template may be a single template name as a string, or an array of templates
+                var templateName = template;
+                if (templateName.constructor === Array && templateName.length > 0) {
+                    // sending a template name to processTextElements() is not ideal as there may be multiple templates involved
+                    // probably not used enough in this way yet to need changes
+                    templateName = template[0];
+                }
+                textElements = this.processTextElements(textElements, layout, templateName);
 
-              if (!scale) {
-                  scale = "";
+                var textElementsStr = JSON.stringify(textElements);
 
-              }
+                if (!scale) {
+                    scale = "";
+                }
 
-              var extentJsonStr = "";
-              if (extent) {
-                  var extentObj = extent.toJson();
-                  extentJsonStr = JSON.stringify(extentObj);
-              }
+                var extentJsonStr = "";
+                if (extent) {
+                    var extentObj = extent.toJson();
+                    extentJsonStr = JSON.stringify(extentObj);
+                }
 
-              if (template.constructor === Array) {
-                  template = JSON.stringify(template);
-              }
+                if (template.constructor === Array) {
+                    template = JSON.stringify(template);
+                }
 
-              var lodsStr = "";
-              if (lodsToSnapTo) {
-                  lodsStr = JSON.stringify(lodsToSnapTo);
-              }
+                var lodsStr = "";
+                if (lodsToSnapTo) {
+                    lodsStr = JSON.stringify(lodsToSnapTo);
+                }
 
-              var params = {
-                  template: template,
-                  layout: layout,
-                  getlayouts: false,
-                  webmap: webmapStr,
-                  textelements: textElementsStr,
-                  format: format,
-                  quality: quality,
-                  scale: scale,
-                  extent: extentJsonStr,
-                  lods: lodsStr,
-                  includelegend: includeLegend
+                var params = {
+                    template: template,
+                    layout: layout,
+                    getlayouts: false,
+                    webmap: webmapStr,
+                    textelements: textElementsStr,
+                    format: format,
+                    quality: quality,
+                    scale: scale,
+                    extent: extentJsonStr,
+                    lods: lodsStr,
+                    includelegend: includeLegend
 
-              }
+                }
 
-              //return this.doGeoprocCallAsync(params, "url");
-              dfd.resolve(this.doGeoprocCallAsync(params, "url"));
+                this.doGeoprocCallAsync(params, "url").then(function (res) {
+                    dfd.resolve(res);
 
+                }, function (err) {
+                    dfd.reject(err);
+                });
 
             }));
-            console.warn('  ===>>>> returning a null, defer this function')
-            return dfd;
+
+            return dfd.promise;
         },
         cancelGeoprocAsync: function () {
 
             var me = this;
-            var gp = this._geoprocesser;
+            var gp = this._geoprocessor;
             if (me._currentJobId) {
-                gp.cancelJob(me._currentJobId, function(resp) {
+                gp.cancelJob(me._currentJobId, function (resp) {
                     // successfully stopped geoprocessing job
                 });
             }
@@ -174,7 +200,7 @@ define(
         doGeoprocCallAsync: function (params, outputValue) {
             this._currentJobId = null;
             var me = this;
-            var gp = this._geoprocesser;
+            var gp = this._geoprocessor;
             var deferred = new Deferred(function () {
                 if (me._currentJobId) {
                     me.cancelGeoprocAsync();
@@ -212,103 +238,145 @@ define(
             return deferred.promise;
 
         },
-        getWebmapJson: function (map) {
+        getWebmapJson: function (map, scale) {
+
 
             var dfd = new Deferred();
-            setTimeout(lang.hitch(this, function(){
-              var webmapData = map.itemInfo.itemData;
+            setTimeout(lang.hitch(this, function () {
 
-              // clear map points selection symbol (cross), this is causing print errors
-              if (map.graphics !== null) {
-                  array.forEach(map.graphics.graphics, function (graphic, i) {
-                      if (typeof graphic != 'undefined') {
-                          if (typeof graphic.symbol != 'undefined') {
-                              if ("style" in graphic.symbol) {
-                                  if (graphic.symbol.style === "target") {
-                                      map.graphics.remove(graphic);
-                                  }
-                              }
-                          }
-                      }
-                  });
-              }
+                var webmapData = null;
+                if (map.itemInfo && map.itemInfo.itemData) {
+                    webmapData = map.itemInfo.itemData;
+                }
 
-              var printTask = new PrintTask();
-              var w = printTask._getPrintDefinition(map);
+                // clear map points selection symbol (cross), this is causing print errors
+                if (map.graphics !== null) {
+                    array.forEach(map.graphics.graphics, function (graphic, i) {
+                        if (typeof graphic != 'undefined') {
+                            if (typeof graphic.symbol != 'undefined') {
+                                if ("style" in graphic.symbol) {
+                                    if (graphic.symbol.style === "target") {
+                                        map.graphics.remove(graphic);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
 
-              //gbs.sjh
-              //var operationalLayers = this.getOperationalLayers(w,map);
-              var mapOptions = w.mapOptions;
-              var operationalLayers;
-              this.getOperationalLayers(w,map).then(lang.hitch(this, function(rslt){
+                var printTask = new PrintTask();
+                // gbs.sjh - second paramater is required at sjapi v3.14, is a PrintTemplate object I think. This is quick fix.
+                var printWebmapData = printTask._getPrintDefinition(map, { preserveScale: false });
 
-                console.log("  ====> getOperationalLayers returned", rslt)
-                operationalLayers = rslt;
+                //gbs.sjh
+                //var operationalLayers = this.getOperationalLayers(w,map);
+                var mapOptions = printWebmapData.mapOptions;
+                var operationalLayers;
+                this.getOperationalLayers(printWebmapData, map, scale).then(lang.hitch(this, function(rslt) {
 
-                // workarounds for bugs/issues in webmap printing
-                // override urls for image symbols, as they are relative
-                // text symbols fail when the feature has attributes
-                array.forEach(operationalLayers, function (layerObj, i) {
-                    if ("featureCollection" in layerObj) {
-                        if ('layers' in layerObj.featureCollection) {
-                            array.forEach(layerObj.featureCollection.layers, function (featLayerObj, i) {
-                                if ('featureSet' in featLayerObj) {
-                                    array.forEach(featLayerObj.featureSet.features, function (feat, i) {
-                                        if ('symbol' in feat) {
-                                            // picture symbol, insert a full url
-                                            if (feat.symbol.type === "esriPMS") {
-                                                // if url is relative
-                                                if (feat.symbol.url.indexOf('http') != 0) {
-                                                    var baseUrl = location.protocol + '//' + location.host + location.pathname;
-                                                    if (baseUrl.slice(-1) !== "/") {
-                                                        baseUrl += "/";
+                    console.log("  ====> getOperationalLayers returned", rslt)
+                    operationalLayers = rslt;
+
+                    // workarounds for bugs/issues in webmap printing
+                    // override urls for image symbols, as they are relative
+                    // text symbols fail when the feature has attributes
+                    array.forEach(operationalLayers, function (layerObj, i) {
+                        if ("featureCollection" in layerObj) {
+                            if ('layers' in layerObj.featureCollection) {
+                                array.forEach(layerObj.featureCollection.layers, function (featLayerObj, i) {
+                                    if ('featureSet' in featLayerObj) {
+                                        array.forEach(featLayerObj.featureSet.features, function (feat, i) {
+                                            if ('symbol' in feat) {
+                                                // picture symbol, insert a full url
+                                                if (feat.symbol.type === "esriPMS") {
+                                                    // if url is relative
+                                                    if (feat.symbol.url.indexOf('http') != 0) {
+                                                        var baseUrl = location.protocol + '//' + location.host + location.pathname;
+                                                        if (baseUrl.slice(-1) !== "/") {
+                                                            baseUrl += "/";
+                                                        }
+                                                        feat.symbol.url = baseUrl + feat.symbol.url;
                                                     }
-                                                    feat.symbol.url = baseUrl + feat.symbol.url;
+                                                }
+                                                // text symbol, remove all attributes
+                                                if (feat.symbol.type === "esriTS") {
+                                                    feat.attributes = {};
                                                 }
                                             }
-                                            // text symbol, remove all attributes
-                                            if (feat.symbol.type === "esriTS") {
-                                                feat.attributes = {};
-                                            }
-                                        }
-                                    });
-                                }
-                            });
+                                        });
+                                    }
+                                });
+                            }
                         }
-                    }
-                });
+                    });
 
-                this.attachWebmapDataToPrintWebmap(w, webmapData);
+                    this.attachWebmapDataToPrintWebmap(printWebmapData, webmapData, map);
 
-                var webmapJson = this.stringify(w);
-                //sjh.gbs
-                //return webmapJson;
-                dfd.resolve(webmapJson);
+                    var webmapJson = this.stringify(printWebmapData);
+                    //sjh.gbs
+                    //return webmapJson;
+                    dfd.resolve(webmapJson);
 
-              }));
+                }));
 
             }));
             return dfd;
         },
-        attachWebmapDataToPrintWebmap: function (printWebmap, webmapData) {
+        attachWebmapDataToPrintWebmap: function (printWebmap, webmapData, map) {
             // attaches "showLegend" property to webmap object, by default this doesn't exist in print webmaps
+            // added DA 28.01.2016, also attaches javascript class as "jsDeclaredClass", this is so the print service can deal with tiled and image layers correctly
 
+            if (!webmapData) {
+                return;
+            }
+
+            // printWebmap includes basemaps in operationalLayers
+            // webmapData has it in a separate "baseMap" property
+            // go through both and match
             for (var a = 0; a < printWebmap.operationalLayers.length; a++) {
                 var printMapOpLayer = printWebmap.operationalLayers[a];
 
                 for (var b = 0; b < webmapData.operationalLayers.length; b++) {
                     var rawMapOpLayerData = webmapData.operationalLayers[b];
                     if (printMapOpLayer.id === rawMapOpLayerData.id) {
-                        if (rawMapOpLayerData.hasOwnProperty("showLegend")) {
-                            printMapOpLayer["showLegend"] = rawMapOpLayerData["showLegend"];
-                        }
-                        if (rawMapOpLayerData.hasOwnProperty("layers") && !printMapOpLayer.hasOwnProperty("layers")) {
-                            printMapOpLayer["layers"] = rawMapOpLayerData["layers"];
-                        }
+                        attachProperties(printMapOpLayer, rawMapOpLayerData);
                         break;
                     }
 
                 }
+
+                for (var c = 0; c < webmapData.baseMap.baseMapLayers.length; c++) {
+                    var rawBasemapLayerData = webmapData.baseMap.baseMapLayers[c];
+
+                    if (printMapOpLayer.id === rawBasemapLayerData.id) {
+                        attachProperties(printMapOpLayer, rawBasemapLayerData);
+                        break;
+                    }
+
+                }
+
+                // if no match found yet, try just finding map layer
+                attachProperties(printMapOpLayer, {});
+
+                // attach JSON properties to be used by print service
+                function attachProperties(printLayerObj, webmapLayerObj) {
+                    
+                    var layer = map.getLayer(printLayerObj.id);
+                    var layerJsClass = layer.declaredClass;
+
+                    printLayerObj["jsDeclaredClass"] = layerJsClass;
+
+                    if (webmapLayerObj.hasOwnProperty("showLegend")) {
+                        printLayerObj["showLegend"] = webmapLayerObj["showLegend"];
+                    }
+                    if (webmapLayerObj.hasOwnProperty("layers") && !printLayerObj.hasOwnProperty("layers")) {
+                        printLayerObj["layers"] = webmapLayerObj["layers"];
+                    }
+                    if (webmapLayerObj.hasOwnProperty("baseMapLayer")) {
+                        printLayerObj["baseMapLayer"] = webmapLayerObj["baseMapLayer"];
+                    }
+                }
+
             }
         },
         processTextElements: function (textElements, printLayout, templateName) {
@@ -316,23 +384,23 @@ define(
             // split attribute values into lines for printing
             // use a max line length, configured per print layout
 
-            var config =  [
+            var config = [
                             // apply specific templates as priority
 							// LIM landscapes
-                            { layout: "A4 Landscape",  maxLineChars: 90},
+                            { layout: "A4 Landscape", maxLineChars: 90 },
 
 							// default portraits
-                            { layout: "A4 Portrait",  maxLineChars: 30 },
-							{ layout: "A3 Portrait",  maxLineChars: 35 },
-							{ layout: "A2 Portrait",  maxLineChars: 40 },
-							{ layout: "A1 Portrait",  maxLineChars: 45 },
-							{ layout: "A0 Portrait",  maxLineChars: 50 },
+                            { layout: "A4 Portrait", maxLineChars: 30 },
+							{ layout: "A3 Portrait", maxLineChars: 35 },
+							{ layout: "A2 Portrait", maxLineChars: 40 },
+							{ layout: "A1 Portrait", maxLineChars: 45 },
+							{ layout: "A0 Portrait", maxLineChars: 50 },
 							// default landscapes
-                            { layout: "A4 Landscape",  maxLineChars: 50 },
-							{ layout: "A3 Landscape",  maxLineChars: 55 },
-							{ layout: "A2 Landscape",  maxLineChars: 60 },
-							{ layout: "A1 Landscape",  maxLineChars: 65 },
-							{ layout: "A0 Landscape",  maxLineChars: 70 }
+                            { layout: "A4 Landscape", maxLineChars: 50 },
+							{ layout: "A3 Landscape", maxLineChars: 55 },
+							{ layout: "A2 Landscape", maxLineChars: 60 },
+							{ layout: "A1 Landscape", maxLineChars: 65 },
+							{ layout: "A0 Landscape", maxLineChars: 70 }
             ];
 
             for (var a = 0; a < config.length; a++) {
@@ -397,184 +465,209 @@ define(
 
             return null;
         },
-        getOperationalLayers:function(w,map){
+        getOperationalLayers: function (w, map, scale) {
 
-          var dfd = new Deferred();
+            var dfd = new Deferred();
             var operationalLayers = w.operationalLayers;
             this.deferredLegendRequests = [];
 
             // get extended map layer infos for each operational Layer
-            operationalLayers.forEach(lang.hitch(this, function(opLayer){
+            operationalLayers.forEach(lang.hitch(this, function (opLayer) {
 
-              // get layer config as set in the webmap
-              var layerWebMapConfig = null;
-              array.forEach(map.itemInfo.itemData.operationalLayers, function(layerWebMapConfigItem){
-                if (layerWebMapConfigItem.id === opLayer.id) {
-                  layerWebMapConfig = layerWebMapConfigItem;
+                // get layer config as set in the webmap
+                var layerWebMapConfig = null;
+                array.forEach(map.itemInfo.itemData.operationalLayers, function (layerWebMapConfigItem) {
+                    if (layerWebMapConfigItem.id === opLayer.id) {
+                        layerWebMapConfig = layerWebMapConfigItem;
+                    }
+                });
+
+                var layer = map.getLayer(opLayer.id);
+                if (layer) {
+                    this.deferredLegendRequests.push(this.getLegendDetails(layer, layerWebMapConfig, scale));
                 }
-              });
-
-              var layer = map.getLayer(opLayer.id);
-              if(layer){
-                this.deferredLegendRequests.push(this.getLegendDetails(layer, layerWebMapConfig));
-              }
             }));
             this.deferredLegendRequetsAll = all(this.deferredLegendRequests);
 
-            this.deferredLegendRequetsAll.then(lang.hitch(this, function(rslts){
-              console.log('deferredRequets results: ', rslts);
+            this.deferredLegendRequetsAll.then(lang.hitch(this, function (rslts) {
+                console.log('deferredRequets results: ', rslts);
 
-              // merge legend count results into core operationalLayers result
-              operationalLayers.forEach(function(layer){
-                array.forEach(rslts, function(rslt){
-                  if (rslt.id === layer.id) {
-                    layer.legendCount = rslt.legendCount
-                  }
+                // merge legend count results into core operationalLayers result
+                operationalLayers.forEach(function (layer) {
+                    array.forEach(rslts, function (rslt) {
+                        if (rslt.id === layer.id) {
+                            layer.legendCount = rslt.legendCount;
+                        }
+                    });
                 });
-              });
 
-              var layerIds = map.graphicsLayerIds;
-              if (layerIds.length) {
-                  operationalLayers = this.extractAndCreateNewTextLayerObject(layerIds, operationalLayers);
-              }
-              //return operationalLayers;
-              dfd.resolve(operationalLayers);
+                var layerIds = map.graphicsLayerIds;
+                if (layerIds.length) {
+                    operationalLayers = this.extractAndCreateNewTextLayerObject(layerIds, operationalLayers);
+                }
+                //return operationalLayers;
+                dfd.resolve(operationalLayers);
 
             }));
-          return dfd;
+            return dfd;
 
         },
         // request the legend details from endpoint if required,
         // otherwise get from locally
-        getLegendDetails: function(layer, layerWebMapConfig){
-          var dfd = new Deferred();
-          //console.log('getLegendDetails: ', layer.declaredClass, " - ", layer)
+        getLegendDetails: function(layer, layerWebMapConfig, scale) {
+            var dfd = new Deferred();
+            //console.log('getLegendDetails: ', layer.declaredClass, " - ", layer)
 
-          setTimeout(lang.hitch(this, function(){
-            switch (layer.declaredClass) {
-              case 'esri.layers.FeatureLayer':
-                var flCount = this.getRendererItemCount(layer.renderer, layerWebMapConfig)
-                console.log('request details from ', layer.type, " - ", flCount);
-                dfd.resolve({
-                  id: layer.id,
-                  legendCount: flCount
-                }); // write get featureLayerLegendCount()
-                break;
+            setTimeout(lang.hitch(this, function () {
+                switch (layer.declaredClass) {
+                    case 'esri.layers.FeatureLayer':
+                        var flCount = this.getRendererItemCount(layer.renderer, layerWebMapConfig);
+                        console.log('request details from ', layer.type, " - ", flCount);
+                        dfd.resolve({
+                            id: layer.id,
+                            legendCount: flCount
+                        }); // write get featureLayerLegendCount()
+                        break;
 
-              case 'esri.layers.ArcGISDynamicMapServiceLayer':
-                console.log('request details from ', layer.url)
-                esriRequest({
-                  url: layer.url + "/legend",
-                  content: {f: 'json'},
-                  handleAs: 'json'
-                }).then(lang.hitch(this, function(rslt){
-                      var legendLayers = this.mergeLayerInfosToLegend(rslt.layers, layer.layerInfos);
-                      var dlCount = this.getLegendCountOfVisibleLayers(layer.visibleLayers, rslt.layers, layerWebMapConfig)
-                      console.log("  ====   count of legend items in: ", rslt.layers.length , " - ", dlCount);
-                      dfd.resolve({
-                        id: layer.id,
-                        legendCount: dlCount
-                      });
-                    }), lang.hitch(this,  function(error){
-                      console.warn('legend request error')
-                      dfd.resolve({});
-                    }));
-                break;
-              default:
-                dfd.resolve({});
-            }
-          }));
+                    case 'esri.layers.ArcGISDynamicMapServiceLayer':
+                        console.log('request details from ', layer.url)
+                        esriRequest({
+                            url: layer.url + "/legend",
+                            content: { f: 'json' },
+                            handleAs: 'json'
+                        }).then(lang.hitch(this, function (rslt) {
+                            var legendLayers = this.mergeLayerInfosToLegend(rslt.layers, layer.layerInfos);
+                            var dlCount = this.getLegendCountOfVisibleLayers(layer, layer.visibleLayers, rslt.layers, layerWebMapConfig, scale);
+                            console.log("  ====   count of legend items in: ", rslt.layers.length, " - ", dlCount);
+                            dfd.resolve({
+                                id: layer.id,
+                                legendCount: dlCount
+                            });
+                        }), lang.hitch(this, function (error) {
+                            console.warn('legend request error')
+                            dfd.resolve({});
+                        }));
+                        break;
+                    default:
+                        dfd.resolve({});
+                }
+            }));
 
-          return dfd;
+            return dfd;
         },
         // adds additional layer infos details from to legendItems
         // returns legendItems
-        mergeLayerInfosToLegend: function(legendItems, layerInfos){
-          legendItemsOut = [];
-          allLayerParents = [];
-          array.forEach(legendItems, function(lgdItem){
-            array.forEach(layerInfos, function(lyrInfoItem){
-              if (lgdItem.layerId === lyrInfoItem.id) {
-                // check parent layers
-                if (lyrInfoItem.parentLayerId > -1) {
-                  var parentslength = allLayerParents.length;
-                  if (parentslength > 0) {
-                    var currentLastParent = allLayerParents[parentslength-1];
-                    if (lyrInfoItem.parentLayerId > currentLastParent ) {
-                      // add the next level of grouping
-                      allLayerParents.push(lyrInfoItem.parentLayerId)
-                    } else if( lyrInfoItem.parentLayerId < currentLastParent ){
-                      // steped back up the tree
-                      allLayerParents.pop()
+        mergeLayerInfosToLegend: function (legendItems, layerInfos) {
+            legendItemsOut = [];
+            allLayerParents = [];
+            array.forEach(legendItems, function (lgdItem) {
+                array.forEach(layerInfos, function (lyrInfoItem) {
+                    if (lgdItem.layerId === lyrInfoItem.id) {
+                        // check parent layers
+                        if (lyrInfoItem.parentLayerId > -1) {
+                            var parentslength = allLayerParents.length;
+                            if (parentslength > 0) {
+                                var currentLastParent = allLayerParents[parentslength - 1];
+                                if (lyrInfoItem.parentLayerId > currentLastParent) {
+                                    // add the next level of grouping
+                                    allLayerParents.push(lyrInfoItem.parentLayerId)
+                                } else if (lyrInfoItem.parentLayerId < currentLastParent) {
+                                    // steped back up the tree
+                                    allLayerParents.pop()
+                                }
+
+                            } else {
+                                // adding first parent id
+                                allLayerParents.push(lyrInfoItem.parentLayerId)
+                            }
+                        } else {
+                            allLayerParents = [];
+                        }
+                        //lang.mixin(lgdItem,lyrInfoItem )
+                        lgdItem.parentLayerId = lyrInfoItem.parentLayerId
+                        lgdItem.parentLayerIds = lang.clone(allLayerParents);
+                        legendItemsOut.push(lgdItem);
                     }
 
-                  }else{
-                    // adding first parent id
-                    allLayerParents.push(lyrInfoItem.parentLayerId)
-                  }
-                }else{
-                  allLayerParents = [];
-                }
-                //lang.mixin(lgdItem,lyrInfoItem )
-                lgdItem.parentLayerId = lyrInfoItem.parentLayerId
-                lgdItem.parentLayerIds = lang.clone(allLayerParents);
-                legendItemsOut.push(lgdItem);
-              }
+                });
 
             });
-
-          });
-          return legendItemsOut;
+            return legendItemsOut;
         },
-        getRendererItemCount: function(renderer, layerWebMapConfig){
-          if (layerWebMapConfig && layerWebMapConfig.showLegend === false) {
-            return 0;
-          }
+        getRendererItemCount: function (renderer, layerWebMapConfig) {
+            if (layerWebMapConfig && layerWebMapConfig.showLegend === false) {
+                return 0;
+            }
 
-          switch (renderer.declaredClass) {
-            case 'esri.renderer.SimpleRenderer':
-              return 1;
-              break;
-            case 'esri.renderer.UniqueValueRenderer':
-              return renderer.infos.length;
-              break;
-            default:
-              return 1;
-          }
+            switch (renderer.declaredClass) {
+                case 'esri.renderer.SimpleRenderer':
+                    return 1;
+                    break;
+                case 'esri.renderer.UniqueValueRenderer':
+                    return renderer.infos.length;
+                    break;
+                default:
+                    return 1;
+            }
         },
         // given array of visible layer id's and layers from legend request
         // return count of items in each visible layer
-        getLegendCountOfVisibleLayers: function(visibleLayers, legendLayers, layerWebMapConfig){
-          console.log('getLegendCountOfVisibleLayers', visibleLayers, legendLayers)
-          var count = 0;
-          array.forEach(legendLayers, lang.hitch(this, function(legendLayer){
-            // test legend item is visible
-            if(visibleLayers.indexOf(legendLayer.layerId) > -1 && this.layerInLegend(legendLayer, layerWebMapConfig)){
-              count += legendLayer.legend.length;
+        getLegendCountOfVisibleLayers: function (dynLayer, visibleLayers, legendLayers, layerWebMapConfig, scale) {
+            console.log('getLegendCountOfVisibleLayers', visibleLayers, legendLayers);
+            var count = 0;
+
+            // first check if map service is in scale
+            if (dynLayer.minScale > 0 && scale >= dynLayer.minScale) {
+                return count;
+            } else if (dynLayer.maxScale > 0 && scale <= dynLayer.maxScale) {
+                return count;
             }
 
-          }));
-          return count;
+            // check map service sub layers
+            array.forEach(legendLayers, lang.hitch(this, function (legendLayer) {
+                // test legend item is visible
+                if (visibleLayers.indexOf(legendLayer.layerId) > -1 && this.layerInLegend(legendLayer, layerWebMapConfig)) {
+                    // scale check
+                    var isInScale = true;
+                    if (legendLayer.minScale > 0 && scale >= legendLayer.minScale) {
+                        // don't include in count
+                        isInScale = false;
+                    } else if (legendLayer.maxScale > 0 && scale <= legendLayer.maxScale) {
+                        isInScale = false;
+                    }
+                    if (isInScale) {
+                        count += legendLayer.legend.length;
+                    }
+                }
+
+            }));
+            return count;
         },
         // checks that the layer is visible and if it or its parents
         // are set to hide in legend
-        layerInLegend: function(legendLayer, webmapLayers){
-          var show = true;
-          if(webmapLayers.layers){
-            // check for sub layer visibility
-            array.forEach(webmapLayers.layers, function(layer){
-              if(layer.id === legendLayer.layerId ||
-                ( legendLayer.parentLayerIds && legendLayer.parentLayerIds.indexOf(layer.id) > -1)){
-                if(layer.showLegend == false){
-                  show = false;
-                }
-              }
-            });
-          }else if (webmapLayers.showLegend == false){
-            // checking layer visibility
-            show = false;
-          }
-          return show;
+        layerInLegend: function (legendLayer, webmapLayers) {
+            var show = true;
+
+            // layer may not have been in webmap after using with add data widget
+            if (webmapLayers === null) {
+                return show;
+            }
+
+            if (webmapLayers.layers) {
+                // check for sub layer visibility
+                array.forEach(webmapLayers.layers, function (layer) {
+                    if (layer.id === legendLayer.layerId ||
+                      (legendLayer.parentLayerIds && legendLayer.parentLayerIds.indexOf(layer.id) > -1)) {
+                        if (layer.showLegend == false) {
+                            show = false;
+                        }
+                    }
+                });
+            } else if (webmapLayers.showLegend == false) {
+                // checking layer visibility
+                show = false;
+            }
+            return show;
         },
         extractAndCreateNewTextLayerObject: function (ids, operationalLayers) {
             var me = this;
@@ -595,7 +688,7 @@ define(
                 return {};
             }
             var layers = layerObj.featureCollection.layers;
-            var pointLayer = array.filter(layers, function (layer,index) {
+            var pointLayer = array.filter(layers, function (layer, index) {
                 return layer.layerDefinition.geometryType === "esriGeometryPoint";
             })[0];
             if (pointLayer) {
