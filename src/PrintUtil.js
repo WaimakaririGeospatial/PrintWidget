@@ -138,8 +138,7 @@ define(
                     // probably not used enough in this way yet to need changes
                     templateName = template[0];
                 }
-                textElements = this.processTextElements(textElements, layout, templateName);
-
+                
                 var textElementsStr = JSON.stringify(textElements);
 
                 if (!scale) {
@@ -379,29 +378,30 @@ define(
 
             }
         },
-        processTextElements: function (textElements, printLayout, templateName) {
+        processTextElements: function (textElements, printLayout, templateName, config) {
 
             // split attribute values into lines for printing
             // use a max line length, configured per print layout
 
+            // example config, should come from widget config
+            /*
             var config = [
-                            // apply specific templates as priority
-							// LIM landscapes
-                            { layout: "A4 Landscape", maxLineChars: 90 },
-
-							// default portraits
-                            { layout: "A4 Portrait", maxLineChars: 30 },
-							{ layout: "A3 Portrait", maxLineChars: 35 },
-							{ layout: "A2 Portrait", maxLineChars: 40 },
-							{ layout: "A1 Portrait", maxLineChars: 45 },
-							{ layout: "A0 Portrait", maxLineChars: 50 },
-							// default landscapes
-                            { layout: "A4 Landscape", maxLineChars: 50 },
-							{ layout: "A3 Landscape", maxLineChars: 55 },
-							{ layout: "A2 Landscape", maxLineChars: 60 },
-							{ layout: "A1 Landscape", maxLineChars: 65 },
-							{ layout: "A0 Landscape", maxLineChars: 70 }
+                // apply specific templates, in priority order
+                
+                // default portraits
+                { "layout": "A4 Portrait", "maxLineChars": 30 },
+                { "layout": "A3 Portrait", "maxLineChars": 35 },
+                { "layout": "A2 Portrait", "maxLineChars": 40 },
+                { "layout": "A1 Portrait", "maxLineChars": 45 },
+                { "layout": "A0 Portrait", "maxLineChars": 50 },
+                // default landscapes
+                { "layout": "A4 Landscape", "maxLineChars": 50 },
+                { "layout": "A3 Landscape", "maxLineChars": 55 },
+                { "layout": "A2 Landscape", "maxLineChars": 60 },
+                { "layout": "A1 Landscape", "maxLineChars": 65 },
+                { "layout": "A0 Landscape", "maxLineChars": 70 }
             ];
+            */
 
             for (var a = 0; a < config.length; a++) {
                 var layoutConfig = config[a];
