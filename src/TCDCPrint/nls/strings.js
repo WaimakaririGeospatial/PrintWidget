@@ -1,6 +1,6 @@
 define({
   root: ({
-    _widgetLabel: "Print Widget",
+    _widgetLabel: "TCDC Print",
     title: "Map Title",
     format: "Format",
     layout: "Layout",

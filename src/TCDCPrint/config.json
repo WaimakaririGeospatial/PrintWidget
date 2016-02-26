@@ -1,0 +1,28 @@
+{
+    "serviceURL": "https://mysite.co.nz/arcgis/rest/services/CustomPrint/GPServer/Print",
+    "formats": [
+        {
+            "label": "PDF",
+            "value": "PDF",
+            "isDefault": true
+        },
+        {
+            "label": "JPG",
+            "value": "JPG"
+        },
+        {
+            "label": "PNG",
+            "value": "PNG"
+        }
+    ],
+    "userTemplates": [],
+    "quality": {
+        "low": 96,
+        "high":  150
+    },
+    "defaultTitle": "Webmap print",
+    "maxTitleLength":  40,
+    "defaultAuthor": "",
+    "defaultCopyright": ""
+
+}
