@@ -5,6 +5,7 @@ from os import path, listdir
 from os.path import join
 from arcpy import mapping
 import uuid
+import extended_print_geoproc_service_settings as settings
 
 
 def processTextElements(mapDoc, textElementDict):
@@ -39,7 +40,7 @@ def _getOperationalLayerObject(webmap, layerId, logFunction = None):
 
         jsonObjLayerTitle = None
         if "title" in jsonOperLayerObj:
-             jsonObjLayerTitle = jsonOperLayerObj["title"]
+            jsonObjLayerTitle = jsonOperLayerObj["title"]
 
         if layerId == jsonObjLayerId:
             resultObj = jsonOperLayerObj
@@ -181,19 +182,60 @@ def getAddLayers(subLayers, visLayerArray):
     return returnLayers
 
 
-def _includeLayerInLegend(legendAddLayer, layerIndexInt, excludeLayers, webmapObj, logFunction):
+def _includeLayerInLegend(legendAddLayer, layerIndexInt, webmapObj, logFunction):
+
+    excludeLayers = settings.LEGEND_EXCLUDE_LAYERS
+    includeLayers = settings.LEGEND_INCLUDE_LAYERS
+    excludeRasters = settings.LEGEND_EXCLUDE_RASTERS
+    excludeBasemaps = settings.LEGEND_EXCLUDE_BASEMAPS
+
 
     #logFunction("Checking legend layer " + str(layerIndexInt) + ": " + legendAddLayer.longName)
     shouldAdd = True
-    try:
-        if legendAddLayer.isRasterLayer:
-            logFunction("RemoveLayers: Raster layer found, skipping: " + legendAddLayer.name)
-            shouldAdd = False
-    except Exception as ex:
-        logFunction("RemoveLayers: Unable to check if layer is raster: " + legendAddLayer.name)
 
     layerWebmapObj = _getOperationalLayerObject(webmapObj, legendAddLayer.name)
     parentLayerWebmapObj = _getParentOperationalLayerObject(webmapObj, legendAddLayer.longName)
+
+    if excludeRasters:
+        # try SDE raster layers first
+        try:
+            if legendAddLayer.isRasterLayer:
+                logFunction("RemoveLayers: Raster layer found, skipping: " + legendAddLayer.name)
+                shouldAdd = False
+        except Exception as ex:
+            logFunction("RemoveLayers: Unable to check if layer is raster: " + legendAddLayer.name)
+
+        # if a map service layer, checking this property doesn't work...
+        #if legendAddLayer.serviceProperties["ServiceType"] == "ImageServer":
+
+        # instead, use info that's been attached client-side
+        if layerWebmapObj:
+            if "jsDeclaredClass" in layerWebmapObj:
+                jsClass = layerWebmapObj["jsDeclaredClass"]
+                if jsClass in ["esri.layers.ArcGISTiledMapServiceLayer", "esri.layers.ArcGISImageServiceLayer"]:
+                    logFunction("RemoveLayers: Raster layer found by jsDeclaredClass: " + legendAddLayer.name)
+                    shouldAdd = False
+        elif parentLayerWebmapObj:
+            if "jsDeclaredClass" in parentLayerWebmapObj:
+                jsClass = parentLayerWebmapObj["jsDeclaredClass"]
+                if jsClass in ["esri.layers.ArcGISTiledMapServiceLayer", "esri.layers.ArcGISImageServiceLayer"]:
+                    logFunction("RemoveLayers: Raster layer found by jsDeclaredClass: " + legendAddLayer.name)
+                    shouldAdd = False
+
+    if excludeBasemaps:
+        if layerWebmapObj:
+            if "baseMapLayer" in layerWebmapObj:
+                isBasemap = layerWebmapObj["baseMapLayer"]
+                if isBasemap:
+                    logFunction("RemoveLayers: Raster layer found by baseMapLayer property: " + legendAddLayer.name)
+                    shouldAdd = False
+        elif parentLayerWebmapObj:
+            if "baseMapLayer" in parentLayerWebmapObj:
+                isBasemap = parentLayerWebmapObj["baseMapLayer"]
+                if isBasemap:
+                    logFunction("RemoveLayers: Raster layer found by baseMapLayer property: " + legendAddLayer.name)
+                    shouldAdd = False
+
 
     if layerWebmapObj and "showLegend" in layerWebmapObj:
         if layerWebmapObj["showLegend"] is False or layerWebmapObj["showLegend"] == 'false':
@@ -219,10 +261,36 @@ def _includeLayerInLegend(legendAddLayer, layerIndexInt, excludeLayers, webmapOb
                 logFunction("RemoveLayers: Layer excluded through print config: " + legendAddLayer.name)
                 shouldAdd = False
                 break
+        elif excludeNameMatch[0] == "*":
+            match = "".join(excludeNameMatch[1:])
+            if legendAddLayer.name.find(match) > -1:
+                # wildcard match found
+                logFunction("RemoveLayers: Layer excluded through print config: " + legendAddLayer.name)
+                shouldAdd = False
+                break
+
+
+
+    # finally check settings for layers to include by name
+    # needs to be last as should take precedence over other logic
+    for includeNameMatch in includeLayers:
+        if includeNameMatch == legendAddLayer.name:
+            logFunction("RemoveLayers: Layer INCLUDED through config: " + legendAddLayer.name)
+            shouldAdd = True
+            break
+        elif includeNameMatch[-1] == "*":
+            match = "".join(includeNameMatch[:-1])
+            if legendAddLayer.name.find(match) > -1:
+                # wildcard match found
+                logFunction("RemoveLayers: Layer INCLUDED through config: " + legendAddLayer.name)
+                shouldAdd = True
+                break
+
     return shouldAdd
 
 
 def removeLayers(mapDoc, removeFromLegendOnly, excludeLayers, removeRasters, webmapObj, logFunction):
+
 
     logFunction("RemoveLayers: Removing raster layers and exclude layers")
     logFunction("Exclude layer settings:")
@@ -263,7 +331,7 @@ def removeLayers(mapDoc, removeFromLegendOnly, excludeLayers, removeRasters, web
             lastGroupLayer = legendAddLayer
             lastGroupLayerIncluded = True
 
-        shouldAdd = _includeLayerInLegend(legendAddLayer, layerIndex, excludeLayers, webmapObj, logFunction)
+        shouldAdd = _includeLayerInLegend(legendAddLayer, layerIndex, webmapObj, logFunction)
 
         if mapServiceName and shouldAdd is False:
             lastMapServiceParentIncluded = False
@@ -283,38 +351,19 @@ def removeLayers(mapDoc, removeFromLegendOnly, excludeLayers, removeRasters, web
                     legendElement.removeItem(legendAddLayer)
                 except Exception as ex:
                     logFunction("RemoveLayers: Unable to remove layer from legend: " + legendAddLayer.name)
-                    logFunction(str(ex))
+
             else:
                 mapping.RemoveLayer(dataFrame, legendAddLayer)
 
         layerIndex += 1
 
 ## test if legend has overflowed through arcpy function and height check
-def isLegendOverflowing(mapDoc, initialHeight, logFunction):
-
-    legendElement = None
-    dataFrame = mapping.ListDataFrames(mapDoc)[0]
+def isLegendOverflowing(mapDoc, logFunction):
 
     legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
-    logFunction("Legend height before: " + str(initialHeight) + " after: " + str(legendElement.elementHeight))
     logFunction("legendElement.isOverflowing: " + str(legendElement.isOverflowing))
-
-    if(legendElement.isOverflowing or legendElement.elementHeight > initialHeight):
-        return True
-    return False
-
-
-## return legend height, or 0 if no legend found
-def getLegendHeight(mapDoc):
-
-    legendElement = None
-    # if removeFromLegendOnly is true, only remove from legend. Otherwise remove from map.
-    legendElement = None
-    try:
-        legendElement = mapping.ListLayoutElements(mapDoc, "LEGEND_ELEMENT", "Legend")[0]
-    except:
-        return 0
-    return legendElement.elementHeight
+    return legendElement.isOverflowing
+    
 
 
 def getSwatchCount(layers, logFunction):
@@ -341,9 +390,9 @@ def getSwatchCountFromWebmap(webmap, logFunction):
     jsonOperLayerObjs = webmap["operationalLayers"]
     for jsonOperLayerObj in jsonOperLayerObjs:
         if jsonOperLayerObj.has_key('legendCount'):
-			if not jsonOperLayerObj.has_key('showLegend') or jsonOperLayerObj['showLegend'] == True:
-				logFunction(str(jsonOperLayerObj['id']) + ' clientItemCount : ' + str(jsonOperLayerObj['legendCount']))
-				legendItemCount += int(jsonOperLayerObj['legendCount'])
+            if not jsonOperLayerObj.has_key('showLegend') or jsonOperLayerObj['showLegend'] == True:
+                logFunction(str(jsonOperLayerObj['id']) + ' clientItemCount : ' + str(jsonOperLayerObj['legendCount']))
+                legendItemCount += int(jsonOperLayerObj['legendCount'])
     return legendItemCount
 
 def substituteLayers(mapDoc, webmap, substitutePath, substituteAlternatives, logFunction):
@@ -522,7 +571,13 @@ def combineImageDocuments(fileList, format):
     return outFilePath
 
 
-def getTargetLegendMxd(legendItemCount, config):
+def getTargetLegendMxd(legendItemCount, config, layoutName = None):
+
+    # if layoutName is supplied, this takes precedence
+    if layoutName:
+        return layoutName
+
+    # otherwise, use config to get page size based on number of items
     targetMxd = None
     for configItem in config:
         if legendItemCount < configItem["itemLimit"]:
@@ -562,7 +617,7 @@ def processInlineLegend(mapDoc, showLegend, excludeLayers, webmapObj, logFunctio
 
 
 
-def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, excludeLayers, webmapObj, styleItemPath = None, styleItemName = None):
+def getMxdLegends(legendMxdList, mapDoc, layoutNameStr, outFolder, logFunction, config, excludeLayers, webmapObj, styleItemPath = None, styleItemName = None):
 
     returnMxdList = []
 
@@ -574,7 +629,7 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
     legendItemCount = getSwatchCount(outLayers, logFunction)
     legendAddLayers = getAddLayers(outLayers, None)
 
-    targetMxd = getTargetLegendMxd(legendItemCount, config)
+    targetMxd = getTargetLegendMxd(legendItemCount, config, layoutNameStr)
 
     # get style items
     style = None
@@ -612,3 +667,31 @@ def getMxdLegends(legendMxdList, mapDoc, outFolder, logFunction, config, exclude
             returnMxdList.append(legendMxd)
 
     return returnMxdList
+
+def webmapToMapDocument(webmapJson, outputFolder, serverConnectionSettings):
+
+    # extra server connections can be used where the log in to portal does not give enough access
+    extraWebmapConversionOptions = {}
+    extraWebmapConversionOptions["SERVER_CONNECTION_FILE"] = serverConnectionSettings
+
+    newUuid = uuid.uuid4()
+    # create temp gdb path used by arcpy for graphics layers
+    newGdbFile = path.join(outputFolder, "_ags_" + str(newUuid) + ".gdb")
+    convertWebmapResult = mapping.ConvertWebMapToMapDocument(webmapJson, None, newGdbFile, extraWebmapConversionOptions)
+    return convertWebmapResult.mapDocument
+
+
+def getTemplateLegendItemLimit(config, template, layoutNameStr):
+
+    layoutItemLimit = -1
+    try:
+        legendStyleTemplateConfig = config[template]
+    except Exception as e:
+        legendStyleTemplateConfig = []
+
+    # check for legend items limit
+    for layoutItem in legendStyleTemplateConfig:
+        if (layoutItem['name']+'.mxd') == layoutNameStr:
+            layoutItemLimit = layoutItem['itemLimit']
+
+    return layoutItemLimit

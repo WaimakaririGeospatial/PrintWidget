@@ -10,17 +10,21 @@ REPLACE_DIR_NAME = ""
 LEGEND_DIR_NAME = ""
 
 
-def getFileNameList(dirPath, fileTypeList):
+def getFileNameList(dirPath, fileTypeList , includeDirs = False):
     # get file names
     fileList = []
     if path.exists(dirPath):
         for file in listdir(dirPath):
-            if path.isfile(join(dirPath, file)):
+            filePath = join(dirPath, file)
+            if path.isfile(filePath):
                 ext = getExtension(file)
                 if ext.lower() in fileTypeList:
                     fileName = path.splitext(file)[0]
                     fileList.append(fileName)
+            elif includeDirs and path.isdir(filePath):
+                fileList.append(file)
     return fileList
+
 
 
 def getFileList(dirPath, fileTypeList):

@@ -61,123 +61,74 @@ def log(s, isError = False):
             resultObj["error"] += "; "
         resultObj["error"] += s
 
-def getTemplateLegendItemLimit(config, template):
-
-    layoutItemLimit = -1
-    try:
-        legendStyleTemplateConfig = config[template]
-    except Exception as e:
-        legendStyleTemplateConfig = []
-
-    # check for legend items limit
-    for layoutItem in legendStyleTemplateConfig:
-        if (layoutItem['name']+'.mxd') == layoutNameStr :
-            layoutItemLimit = layoutItem['itemLimit']
-
-    return layoutItemLimit
-
-def process(templateRootPath,
-            layoutNameStr,
-            outputFolder,
-            formatStr,
-            quality,
-            mapScale,
-            extentObj,
-            textElementsList,
-            lodsArray,
-            includeLegend,
-            legendExcludeLayers,
-            legendTemplateConfig,
-            layoutItemLimit):
 
 
-    log("Using template root: " + templateRootPath)
-    if not path.isdir(templateRootPath):
-        raise Exception("No template exists for: " + templateRootPath)
 
-    # process layout mxds
-    legendPdfList = fileUtils.getLegendPdfList(templateRootPath)
-    legendMxdList = fileUtils.getLegendMxdList(templateRootPath)
-    replaceList = fileUtils.getReplaceLayerOrMapDocList(templateRootPath)
+def getMapDocForStandardTemplates(webmapMapDoc, outputFolder, layoutMxd, extent, mapScale, lodsArray):
 
-    layoutMxd = fileUtils.getLayoutMapDoc(templateRootPath, layoutNameStr)
-    log("Using layout map doc: " + layoutMxd.filePath)
-    initialLegendHeight = mapUtils.getLegendHeight(layoutMxd)
+    fromLayers = mapping.ListLayers(webmapMapDoc)
+    log("Copying webmap layers to layout map doc...")
+    outMapDoc = mapUtils.copyLayers(fromLayers, layoutMxd, outputFolder)
+    outMapDoc = mapUtils.setExtentAndScale(outMapDoc, extent, mapScale, lodsArray)
 
-    # webmaps
-    log("Converting webmaps to map documents...")
-    # create temp gdb path used by arcpy for graphics layers
-    newUuid = uuid.uuid4()
-    newGdbFile = path.join(outputFolder, "_ags_" + str(newUuid) + ".gdb")
-
-    convertWebmapResult = mapping.ConvertWebMapToMapDocument(webmapJson, None, newGdbFile, extraWebmapConversionOptions)
-    webmapMapDoc = convertWebmapResult.mapDocument
-    webmapDataframe = mapping.ListDataFrames(webmapMapDoc)[0]
-    newExtent = webmapDataframe.extent
-    if extentObj:
-        newExtent.XMin = extentObj['xmin']
-        newExtent.YMin = extentObj['ymin']
-        newExtent.XMax = extentObj['xmax']
-        newExtent.YMax = extentObj['ymax']
+    # debug - save webmap mxd
+    #outMapDoc.saveACopy(path.join(outputFolder, str(newUuid) + "_WEBMAP_LAYERS_TEMP.mxd"))
+    return outMapDoc
 
 
-    # create list of output pdf or image files for concatenating later
-    exportedImageFilePaths = []
-    outputMapDocs = []
+def getMapDocsForPresetTemplates(replaceList, layoutMxd, outputFolder, extent, mapScale, lodsArray):
 
-    ## if there are replace map docs or layers, replace entire dataframe
-    if len(replaceList) == 0:
-        fromLayers = mapping.ListLayers(webmapMapDoc)
-        log("Copying webmap layers to layout map doc...")
-        outMapDoc = mapUtils.copyLayers(fromLayers, layoutMxd, outputFolder)
-        outMapDoc = mapUtils.setExtentAndScale(outMapDoc, newExtent, mapScale, lodsArray)
+    mapDocList = []
+    log("Replacement layers found. Webmap layers will be ignored")
+    for replaceLayerOrMapDocPath in replaceList:
 
-        # debug - save webmap mxd
-        #outMapDoc.saveACopy(path.join(outputFolder, str(newUuid) + "_WEBMAP_LAYERS_TEMP.mxd"))
+        layersToCopy = []
+        title = fileUtils.getName(replaceLayerOrMapDocPath)
+        log("Processing map: " + title)
 
-        outputMapDocs.append(outMapDoc)
+        if fileUtils.getExtension(replaceLayerOrMapDocPath) == "mxd":
+            replaceMapDoc = mapping.MapDocument(replaceLayerOrMapDocPath)
+            layersToCopy = mapping.ListLayers(replaceMapDoc)
 
-    else:
-        log("Replacement layers found. Webmap layers will be ignored")
-        for replaceLayerOrMapDocPath in replaceList:
+        elif fileUtils.getExtension(replaceLayerOrMapDocPath) == "lyr":
+            replaceLayer = mapping.Layer(replaceLayerOrMapDocPath)
+            layersToCopy.append(replaceLayer)
 
-            layersToCopy = []
-            title = fileUtils.getName(replaceLayerOrMapDocPath)
-            log("Processing map: " + title)
+        log("Copying layers from: " + replaceLayerOrMapDocPath)
+        outMapDoc = mapUtils.copyLayers(layersToCopy, layoutMxd, outputFolder, True)
+        outMapDoc = mapUtils.setExtentAndScale(outMapDoc, extent, mapScale, lodsArray)
 
-            if fileUtils.getExtension(replaceLayerOrMapDocPath) == "mxd":
-                replaceMapDoc = mapping.MapDocument(replaceLayerOrMapDocPath)
-                layersToCopy = mapping.ListLayers(replaceMapDoc)
+        log("Processing text elements...")
+        mapUtils.processTextElements(outMapDoc, {settings.REPLACE_LAYER_ELEMENT_NAME: title})
+        mapDocList.append(outMapDoc)
 
-            elif fileUtils.getExtension(replaceLayerOrMapDocPath) == "lyr":
-                replaceLayer = mapping.Layer(replaceLayerOrMapDocPath)
-                layersToCopy.append(replaceLayer)
+    return mapDocList
 
-            log("Copying layers from: " + replaceLayerOrMapDocPath)
-            outMapDoc = mapUtils.copyLayers(layersToCopy, layoutMxd, outputFolder, True)
-            outMapDoc = mapUtils.setExtentAndScale(outMapDoc, newExtent, mapScale, lodsArray)
 
-            log("Processing text elements...")
-            mapUtils.processTextElements(outMapDoc, {settings.REPLACE_LAYER_ELEMENT_NAME: title})
-            outputMapDocs.append(outMapDoc)
+def getMapDocListWithLegends(outputMapDocs, outputFolder, webMapObj, layoutItemLimit, templateRootPath,
+                             newExtent, mapScale, lodsArray, textElementsList,
+                             layoutNameStr, legendMxdList):
+
+    legendExcludeLayers = settings.LEGEND_EXCLUDE_LAYERS
+    styleFile = settings.LEGEND_STYLE_FILE
+    styleName = settings.LEGEND_STYLE_NAME
+    legendTemplateConfig = settings.LEGEND_TEMPLATE_CONFIG
+
+    outMapDocsWithLegends = []
 
     for outMapDoc in outputMapDocs:
-
-        styleFile = settings.LEGEND_STYLE_FILE
-        styleName = settings.LEGEND_STYLE_NAME
-
 
         switchToNoLegendMxd = False
         legendItemCount = 0
         if includeLegend:
-            # get swatch cound for map doc
+            # get swatch count for map doc
             mapDocCloneForLegend = mapUtils.getMapDocForLegend(outMapDoc, legendExcludeLayers, outputFolder, log, webMapObj)
             legendLayers = mapping.ListLayers(mapDocCloneForLegend)
             # get approx swatch count, used for selecting legend mxd
             legendItemCount = mapUtils.getSwatchCount(legendLayers, log)
             log("Legend swatch count estimate: " + str(legendItemCount))
 
-            legendIsOverflowing = mapUtils.isLegendOverflowing(mapDocCloneForLegend, initialLegendHeight, log)
+            legendIsOverflowing = mapUtils.isLegendOverflowing(mapDocCloneForLegend, log)
             log("Legend is overflowing (arcpy): " + str(legendIsOverflowing))
 
             # secondary check as sometimes the arcpy appraoch allows overflowing
@@ -202,7 +153,7 @@ def process(templateRootPath,
         if switchToNoLegendMxd:
             # either no legend requested or a second page legend is being used
             # clone document onto new legend layout
-            newLayoutName = layoutNameStr.replace(".mxd", " no legend.mxd")
+            newLayoutName = layoutNameStr.replace(".mxd", noLegendMxdNameSuffix + ".mxd")
             newLayoutMxd = fileUtils.getLayoutMapDoc(templateRootPath, newLayoutName)
             if newLayoutMxd:
                 fromLayers = mapping.ListLayers(outMapDoc)
@@ -214,19 +165,82 @@ def process(templateRootPath,
 
         # export maing print file
         log("Exporting file...")
-        exportFile = mapUtils.exportMapDocToFile(outMapDoc, formatStr, outputFolder, quality)
-        exportedImageFilePaths.append(exportFile)
+        outMapDocsWithLegends.append(outMapDoc)
 
         # process mxd legends, attached as second page
         if includeLegend and switchToNoLegendMxd:
             log("Processing legends")
             # references an mxd on disk to use for legend
-            targetLegendMxd = mapUtils.getTargetLegendMxd(legendItemCount, legendTemplateConfig)
+            targetLegendMxd = mapUtils.getTargetLegendMxd(legendItemCount, legendTemplateConfig, layoutNameStr)
             log("Using legend template: " + targetLegendMxd)
-            processedLegendMxds = mapUtils.getMxdLegends(legendMxdList, outMapDoc, outputFolder, log, legendTemplateConfig, legendExcludeLayers, webMapObj, styleFile, styleName)
+            processedLegendMxds = mapUtils.getMxdLegends(legendMxdList, outMapDoc, layoutNameStr, outputFolder, log,
+                                                         legendTemplateConfig, legendExcludeLayers, webMapObj, styleFile, styleName)
             for legendMxd in processedLegendMxds:
-                exportLegendFile = mapUtils.exportMapDocToFile(legendMxd, formatStr, outputFolder, quality)
-                exportedImageFilePaths.append(exportLegendFile)
+                outMapDocsWithLegends.append(legendMxd)
+
+
+    return outMapDocsWithLegends
+
+
+
+def process(templateRootPath,
+            layoutNameStr,
+            outputFolder,
+            formatStr,
+            quality,
+            mapScale,
+            extentObj,
+            textElementsList,
+            lodsArray,
+            includeLegend,
+            layoutItemLimit):
+
+
+
+    log("Using template root: " + templateRootPath)
+    if not path.isdir(templateRootPath):
+        raise Exception("No template exists for: " + templateRootPath)
+
+    # process file lists
+    legendPdfList = fileUtils.getLegendPdfList(templateRootPath)
+    legendMxdList = fileUtils.getLegendMxdList(templateRootPath)
+    replaceList = fileUtils.getReplaceLayerOrMapDocList(templateRootPath)
+
+    layoutMxd = fileUtils.getLayoutMapDoc(templateRootPath, layoutNameStr)
+    log("Using layout map doc: " + layoutMxd.filePath)
+
+    # webmaps
+    log("Converting webmaps to map documents...")
+    webmapMapDoc = mapUtils.webmapToMapDocument(webmapJson, outputFolder, settings.SERVER_CONNECTIONS)
+
+    webmapDataframe = mapping.ListDataFrames(webmapMapDoc)[0]
+    newExtent = webmapDataframe.extent
+    if extentObj:
+        newExtent.XMin = extentObj['xmin']
+        newExtent.YMin = extentObj['ymin']
+        newExtent.XMax = extentObj['xmax']
+        newExtent.YMax = extentObj['ymax']
+
+
+    # create list of output pdf or image files for concatenating later
+    exportedImageFilePaths = []
+    outputMapDocs = []
+
+    ## if there are replace map docs or layers, replace entire dataframe
+    if len(replaceList) == 0:
+        outMapDoc = getMapDocForStandardTemplates(webmapMapDoc, outputFolder, layoutMxd, newExtent, mapScale, lodsArray)
+        outputMapDocs.append(outMapDoc)
+
+    else:
+        outMapDocList = getMapDocsForPresetTemplates(replaceList, layoutMxd, outputFolder, newExtent, mapScale, lodsArray)
+        outputMapDocs.extend(outMapDocList)
+
+    mapDocListWithLegends = getMapDocListWithLegends(outputMapDocs, outputFolder, webMapObj, layoutItemLimit, templateRootPath, newExtent,
+                                                     mapScale, lodsArray, textElementsList, layoutNameStr, legendMxdList)
+    for legendMapDoc in mapDocListWithLegends:
+        exportLegendFile = mapUtils.exportMapDocToFile(legendMapDoc, formatStr, outputFolder, quality)
+        exportedImageFilePaths.append(exportLegendFile)
+
 
     # append pdf legends
     if includeLegend:
@@ -270,18 +284,7 @@ try:
 
     ## DEBUG ##
     #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":1755268.0160213956,"ymin":5920584.470725218,"xmax":1755841.2937333588,"ymax":5920863.645027658,"spatialReference":{"wkid":2193,"latestWkid":2193}},"spatialReference":{"wkid":2193,"latestWkid":2193}},"operationalLayers":[{"id":"Light_1246","title":"Light_1246","opacity":1,"minScale":18489297.737236,"maxScale":1128.497176,"url":"https://s1-ts.cloud.eaglegis.co.nz/arcgis/rest/services/Canvas/Light/MapServer"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,15,16,17,19,20,21,22],"layers":[{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2],"showLegend":false},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
-    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19423895.228000317,"ymin":-4434093.601296845,"xmax":19471477.278107774,"ymax":-4404550.689864664,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"World_Street_Map_8421","title":"World_Street_Map_8421","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer"},{"id":"SPWM_DRIVER_TESTING_UAT_5316","title":"SPWM_DRIVER_TESTING_UAT","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/SPWM_DRIVER_TESTING_UAT/MapServer","visibleLayers":[0,1,2],"layers":[{"id":1,"showLegend":false}]},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22],"layers":[{"id":16,"showLegend":false},{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2]},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"RSRPTest_6878","title":"RSRPTest","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/RSRPTest/MapServer","visibleLayers":[0,1]},{"id":"CamerasRelate_3610","title":"CamerasRelate","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/CamerasRelate/MapServer","visibleLayers":[0]},{"id":"NZTA_Theme_Cameras_8509","title":"NZTA_Theme_Cameras","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Theme_Cameras/MapServer","visibleLayers":[0]},{"id":"NZTACamerasTime_6661","title":"NZTACamerasTime","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTACamerasTime/MapServer","visibleLayers":[0,1]},{"id":"PID_Service_5963","title":"PID_Service","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/MRP/PID_Service/MapServer","visibleLayers":[0,1]},{"id":"NZTA_Editing_4351","title":"NZTA_Editing - Edit Polygons","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"color":[223,115,255,255],"outline":{"color":[110,110,110,255],"width":0.6,"type":"esriSLS","style":"esriSLSSolid"},"type":"esriSFS","style":"esriSFSSolid"}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/2","showLegend":true},{"id":"NZTA_Editing_4718","title":"NZTA_Editing - Edit Lines","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"color":[76,0,115,255],"width":1.7,"type":"esriSLS","style":"esriSLSSolid"}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/1"},{"id":"NZTA_Editing_9805","title":"NZTA_Editing - Edit Points","opacity":1,"minScale":0,"maxScale":0,"layerDefinition":{"drawingInfo":{"renderer":{"type":"simple","label":"","description":"","symbol":{"angle":0,"xoffset":0,"yoffset":0,"type":"esriPMS","url":"6424ad8f91e78472b03bd60a67ce739b","imageData":"iVBORw0KGgoAAAANSUhEUgAAABIAAAAPCAYAAADphp8SAAAAAXNSR0IB2cksfwAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAS1JREFUOI2d0ztLw1AYxvH/kWKlFC9VCG1Xh4KbODgo+gEEwVsm6SAUQZykToLFwQuKOEq2DoVEXQR3V7+Ak6ttiJRMdkg1PQ7WamJJ0zzbe3jP7zzLiREit9ST60y8B+3EeiE6ZqJF87GMtZhHaUSGRFzu4zAzhLsHHEWCDF6zOBTbY9HAulZR3iI0GjgGEu0hCa1DYKcvSE+Z09hy03sqCwbVK5XsS2hI2PISEP59iTgB1kJBBrUVYKHrA7B6kzJnN+z0UyCkUR+UNM/8Vf5G2vIcmA+EhvnYFTAZ4ADMGdSWVTL3XaE7quMu8qAH8p04p5rz/FBgyv0HfSJKAkZDQQ65Eca2AM0D6Zg5gdwOhfymVMaq5FEaHUggL/wNQyT983U6F1UyS30innwBr21SCpiLLJcAAAAASUVORK5CYII=","contentType":"image/png","width":13,"height":11}}}},"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTA_Editing/FeatureServer/0","showLegend":true},{"id":"graphicsLayer1","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[{"layerDefinition":{"name":"polygonLayer","geometryType":"esriGeometryPolygon"},"featureSet":{"geometryType":"esriGeometryPolygon","features":[{"geometry":{"rings":[[[19444380.351580717,-4415672.277480143],[19447858.236367688,-4415442.966395288],[19448546.16962225,-4422589.828539941],[19444991.847806994,-4422131.206370232],[19442545.862901874,-4418691.540097403],[19444380.351580717,-4415672.277480143]]],"spatialReference":{"wkid":102100}},"attributes":{"uniqueId":1443148676503},"symbol":{"color":[255,255,0,128],"outline":{"color":[71,105,146,255],"width":1.5,"type":"esriSLS","style":"esriSLSSolid"},"type":"esriSFS","style":"esriSFSSolid"}}]}}]}},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
-    #extentJson = '{"xmin":19423895.228000317,"ymin":-4434093.601296845,"xmax":19471477.278107774,"ymax":-4404550.689864664,"spatialReference":{"wkid":102100}}'
-    ##gbs.sjh - test small legend
-    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19452132.11070773,"ymin":-4417935.657548526,"xmax":19452727.48349844,"ymax":-4417515.2538929,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"OpenStreetMap","title":"OpenStreetMap","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://a.tile.openstreetmap.org","type":"OpenStreetMap"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22],"legendCount":8,"layers":[{"id":16,"showLegend":false},{"id":0,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
-    #extent = '{"xmin":19452132.11070773,"ymin":-4417935.657548526,"xmax":19452727.48349844,"ymax":-4417515.2538929,"spatialReference":{"wkid":102100}}'
-
-    ##gbs - test simple unique item renderer
-    ##webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":19379067.474906977,"ymin":-4340911.062590534,"xmax":19487684.492100064,"ymax":-4278462.0104816295,"spatialReference":{"wkid":102100}},"spatialReference":{"wkid":102100}},"operationalLayers":[{"id":"OpenStreetMap","title":"OpenStreetMap","opacity":1,"minScale":591657527.591555,"maxScale":1128.497176,"url":"http://a.tile.openstreetmap.org","type":"OpenStreetMap"},{"id":"NZTACamerasTime_6661","title":"NZTACamerasTime","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/NZTA/NZTACamerasTime/MapServer","visibleLayers":[1]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
-    ##extent = '{"xmin":19379067.474906977,"ymin":-4340911.062590534,"xmax":19487684.492100064,"ymax":-4278462.0104816295,"spatialReference":{"wkid":102100}}'
-
-    #webmapJson = '{"mapOptions":{"showAttribution":true,"extent":{"xmin":1755268.0160213956,"ymin":5920584.470725218,"xmax":1755841.2937333588,"ymax":5920863.645027658,"spatialReference":{"wkid":2193,"latestWkid":2193}},"spatialReference":{"wkid":2193,"latestWkid":2193}},"operationalLayers":[{"id":"Light_1246","title":"Light_1246","opacity":1,"minScale":18489297.737236,"maxScale":1128.497176,"url":"https://s1-ts.cloud.eaglegis.co.nz/arcgis/rest/services/Canvas/Light/MapServer"},{"id":"Landbase_5000","title":"Landbase","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Landbase/MapServer","visibleLayers":[1,2,3,4,5,6,7,8,9,10,11,12,13,15,16,17,19,20,21,22],"layers":[{"id":0,"showLegend":false}]},{"id":"Address_2359","title":"Address","opacity":1,"minScale":16000,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Address/MapServer","visibleLayers":[1,2],"showLegend":false},{"id":"Contours_4135","title":"Contours","opacity":1,"minScale":0,"maxScale":0,"url":"https://secure.gbs.co.nz/arcgis_anon/rest/services/Contours/MapServer","visibleLayers":[1,2,4,5,7,8,10,11,13,14,16,17,19,20,21,22,23],"layers":[{"id":5,"showLegend":false},{"id":2,"showLegend":false},{"id":8,"showLegend":false},{"id":17,"showLegend":false},{"id":20,"showLegend":false},{"id":14,"showLegend":false},{"id":11,"showLegend":false}]},{"id":"map_graphics","opacity":1,"minScale":0,"maxScale":0,"featureCollection":{"layers":[]}}]}'
-    #mapScaleStr = '1128.497176'
+    #mapScaleStr = '20000'
     #layoutNameStr = 'A4 Landscape'
     #templateStr = 'Standard'
     #qualityStr = '96'
@@ -339,11 +342,11 @@ try:
     includeLegend = True
     if includeLegendStr == "false":
         includeLegend = False
-    # get graphics and raster layer names to exclude
-    legendExcludeLayers = settings.LEGEND_EXCLUDE_LAYERS
 
     outputFolder = settings.AGS_OUTPUT_DIRECTORY
     outputFolderUrl = settings.AGS_VIRTUAL_OUTPUT_DIRECTORY
+
+    noLegendMxdNameSuffix = " no legend"
 
     # templates may be requested as a singele string 'standard', or a json array '["standard", "LIM 1"]'
     templateList = []
@@ -354,27 +357,31 @@ try:
 
     # just return the layout styles from the template folders - NOT producing a map export
     if getLayoutsStr and getLayoutsStr == "true":
-        template = templateList[0]
-        templateRootPath = path.join(settings.TEMPLATES_PATH, template)
-        layoutNameList = fileUtils.getLayoutNameList(templateRootPath)
-        resultObj["layouts"] = layoutNameList
+
+        templatesOnDiskList = fileUtils.getFileNameList(settings.TEMPLATES_PATH, [], True)
+        resultObj["templates"] = templatesOnDiskList
+
+        if len(templateList) > 0:
+            template = templateList[0]
+            templateRootPath = path.join(settings.TEMPLATES_PATH, template)
+            layoutNameList = fileUtils.getLayoutNameList(templateRootPath)
+            layoutNameList = [a for a in layoutNameList if a.lower().find(noLegendMxdNameSuffix) < 0]
+            resultObj["layouts"] = layoutNameList
 
     else:
         # sign in to portal as an admin user so we have access to all webmap layers
         if settings.PORTAL_USER:
             log("Signing in to: " + settings.PORTAL_URL)
             arcpy.SignInToPortal_server(settings.PORTAL_USER, settings.PORTAL_PASSWORD, settings.PORTAL_URL)
-        # extra server connections can be used where the log in to portal does not give enough access
-        extraWebmapConversionOptions = {}
-        extraWebmapConversionOptions["SERVER_CONNECTION_FILE"] = settings.SERVER_CONNECTIONS
 
         # process each file and combine
         outFiles = []
         for template in templateList:
             templateRootPath = path.join(settings.TEMPLATES_PATH, template)
-            layoutItemLimit = getTemplateLegendItemLimit(settings.LEGEND_STYLE_TEMPLATE_LIMITS_CONFIG, template)
+            layoutItemLimit = mapUtils.getTemplateLegendItemLimit(settings.LEGEND_STYLE_TEMPLATE_LIMITS_CONFIG,
+                                                                  template, layoutNameStr)
             generatedOutFiles = process(templateRootPath, layoutNameStr, outputFolder, formatStr, quality, mapScale, extentObj,
-                textElementsList, lodsArray, includeLegend, legendExcludeLayers, settings.LEGEND_TEMPLATE_CONFIG, layoutItemLimit)
+                textElementsList, lodsArray, includeLegend, layoutItemLimit)
             outFiles.extend(generatedOutFiles)
         if len(outFiles) > 0:
 
