@@ -16,6 +16,7 @@
         }
     ],
     "userTemplates": [],
+	"showQualitySelector":true,
     "quality": {
         "low": 96,
         "high":  150

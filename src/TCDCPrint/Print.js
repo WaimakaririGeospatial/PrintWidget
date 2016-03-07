@@ -118,6 +118,7 @@ define([
             this.printUtil.setServiceUrl(this.printTaskURL);
 
             this._setPrintTemplates();
+            this._setPrintQualityVisibility();
             this._setPrintFormats();
 
             domStyle.set(this.advancedButtonDijit.domNode, 'display', '');
@@ -171,6 +172,10 @@ define([
             }
             this.mxdTemplateDijit.on("change", lang.hitch(this, '_updateLayout'));
             this.mxdTemplateDijit.onChange();
+        },
+        _setPrintQualityVisibility: function () {
+            var state = this.config.showQualitySelector ? "block" : "none";
+            domStyle.set(this.printQualityFormDijit.domNode, 'display', state);
         },
         _setPrintFormats:function(){
             var formats = this.config.formats;

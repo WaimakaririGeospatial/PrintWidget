@@ -172,7 +172,7 @@ define([
 
             this.qualityHighInput.setValue(qualHighVal);
             this.qualityLowInput.setValue(qualLowVal);
-
+            this.showQualitySelector.checked = config.showQualitySelector ? true : false;
             this._userTemplateData = this.config.userTemplates;
 
             this.defaultTitleInput.setValue(this.config.defaultTitle);
@@ -226,7 +226,7 @@ define([
             this.config.maxTitleLength = this.maxTitleLengthInput.getValue();
             this.config.defaultAuthor = this.defaultAuthorInput.getValue();
             this.config.defaultCopyright = this.defaultCopyrightInput.getValue();
-
+            this.config.showQualitySelector = this.showQualitySelector.checked;
             return this.config;
 
         },

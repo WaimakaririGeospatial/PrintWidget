@@ -81,3 +81,34 @@
 .gis_PrintDijit .dijitArrowButtonContainer{
   width: 17px;
 }
+
+
+
+
+.jimu-btn .dijitArrowButtonInner {
+    background-image: url("../images/custom/arrow.png");
+    background-repeat: no-repeat;
+    background-position: center !important;
+}
+.jimu-btn-small .dijitButtonNode,.jimu-btn .dijitButtonNode{
+    background-image:none !important;
+    background-color:transparent !important;
+    border: none !important;
+}
+.jimu-btn .dijitButtonText{
+    padding:0px !important;
+    color: #fff  !important; 
+}
+.jimu-btn-small.dijitToggleButtonChecked,.jimu-btn.dijitToggleButtonChecked {
+    background-color: #E55303 !important;
+}
+
+.jimu-btn .settingsIcon {
+    background: url("../images/custom/settings.png") no-repeat scroll center center transparent !important;
+}
+.jimu-btn .printIcon {
+    background: url("../images/custom/print.png") no-repeat scroll center center transparent !important;
+}
+.jimu-btn .clearIcon {
+    background: url("../images/custom/clear.png") no-repeat scroll center center transparent !important;
+}
