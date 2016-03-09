@@ -179,8 +179,9 @@ define([
           },
           _setVersionTitle: function () {
               var labelNode = this._getLabelNode(this);
+
               var manifestInfo = this.manifest;
-              var devVersion = manifestInfo.version;
+              var devVersion = manifestInfo.devVersion;
               var devWabVersion = manifestInfo.developedAgainst || manifestInfo.wabVersion;
               var codeSourcedFrom = manifestInfo.codeSourcedFrom;
               var client = manifestInfo.client;
@@ -191,7 +192,6 @@ define([
               if (codeSourcedFrom) {
                   title += "Code sourced from: " + codeSourcedFrom + "\n";
               }
-
               if (labelNode) {
                   domAttr.set(labelNode, 'title', title);
               }
