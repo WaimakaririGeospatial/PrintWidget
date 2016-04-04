@@ -1,0 +1,69 @@
+<div style="width:100%; height:100%;" >
+    <div data-dojo-attach-point="initialSection" class="setting-section">
+        <div class="setting-item">
+            <div>Service URL: </div>
+            <input type="text" data-dojo-type="dijit/form/ValidationTextBox"
+                   data-dojo-attach-point="serviceURL"
+                   required="false" data-dojo-props="style:{width:'100%'}"/>
+        </div>
+    </div>
+    <div data-dojo-attach-point="errorDiv" class="gone errorDiv">
+        An error occurred finding a print service at this URL. A customised geoprocessing print service is required. Please check that the service URL is correct, and the service is running.
+    </div>
+    <div  data-dojo-attach-point="mainSection" style="position: relative;" >
+
+        <div class="setting-section">
+            <div class="section-heading">Map Elements</div>
+            <div class="setting-item">
+                <div style="width: 100px; display: inline-block">Default Title</div><input type="text" style="width: auto;" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="defaultTitleInput"/>
+            </div>
+            <div class="setting-item">
+                <div style="width: 100px; display: inline-block">Max Title Length</div><input type="text" style="width: auto;" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="maxTitleLengthInput" />
+            </div>
+            <div class="setting-item">
+                <div style="width: 100px; display: inline-block">Default Author</div><input type="text" style="width: auto;" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="defaultAuthorInput"/>
+            </div>
+            <div class="setting-item">
+                <div style="width: 100px; display: inline-block">Default Copyright</div><input type="text" style="width: auto;" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="defaultCopyrightInput" />
+            </div>
+            
+        </div>
+
+        <div class="setting-section">
+            <div class="setting-item" style = "margin-bottom:10px;"> 
+                <input data-dojo-attach-point="showQualitySelector"  type="checkbox"/> <label for="includeExportImport">Show Quality Selection In Widget</label>    
+            </div>
+            <div class="section-heading">Print Quality</div>
+            <div class="setting-item">
+                <div style="width: 70px; display: inline-block" >High DPI</div><input type="text" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="qualityHighInput"/>
+            </div>
+            <div class="setting-item">
+                <div style="width: 70px; display: inline-block">Low DPI</div><input type="text" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-attach-point="qualityLowInput"/>
+            </div>
+        </div>
+
+        <div class="setting-section" style="min-height: 200px; display: block;" >
+            <div class="section-heading" >Print Templates</div>
+
+            <div class="col1">
+                <div class="add-label-container">
+                    <span class="add-icon"></span>
+                    <span class="add-label" data-dojo-attach-point="addUserTemplateDiv">Add User Templates</span>
+                </div>
+                <div data-dojo-attach-point="userTemplateListContainer"></div>
+            </div>
+
+            <div class="col2" >
+                <div class="col2row1">
+                    <div class="add-label-container hidden" data-dojo-attach-point="addServerTemplateDivContainer" >
+                        <span class="add-icon"></span>
+                        <span class="add-label" data-dojo-attach-point="addServerTemplateDiv"></span>
+                    </div>
+                    <div data-dojo-attach-point="serverTemplateListContainer"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
